@@ -1,0 +1,17 @@
+# config file
+CONFIGURE
+
+# Object files, in general
+*.glob
+*.vo
+*.vo[ks]
+.*.aux
+
+# Generated files
+.depend
+
+# Coq caches
+.lia.cache
+.nia.cache
+.nra.cache
+.csdp.cache

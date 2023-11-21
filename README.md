@@ -2,7 +2,7 @@
 
 在这个问题中，我们将给出一个简单字节码程序的指称语义，并给出了 Plonk 协议规定的一系列约束的定义。我们还会给出满足这些约束的简单字节码程序的 trace 符合指称语义的 soundness 证明，以及一系列已证明的引理作为参考。具体而言，学生需参考 `soundness_of_protocol` 的定义并给出 `completeness_of_protocol` 的定义并完成证明，关键证明代码处必须提供注释，学生还需在 `doc` 文件夹中提供一份类似 `4. soundness 证明思路` 的数学证明以说明你的证明的整体思路。
 
-以下是说明文档，包含了一些基本的定义和引理，以及一些有用的参考资料，所有参考的代码均在文件 `zkevm.v` 中，请在 `Completeness.v` 中定义并证明 completeness_of_protocol，你可以参考 `Completeness.v` 文件开头的环境配置将引理写在多个文件中。对本大作业如有任何疑问，请及时联系助教寻求帮助。
+以下是说明文档，包含了一些基本的定义和引理，以及一些有用的参考资料，所有参考的代码均在文件 `pv/Definition_and_soundness.v` 中，请在 `Completeness.v` 中定义并证明 completeness_of_protocol，你可以参考 `Completeness.v` 文件开头的环境配置将引理写在多个文件中。对本大作业如有任何疑问，请及时联系助教寻求帮助。
 
 关于环境配置的说明：本代码库使用的 coq 版本为
 ```

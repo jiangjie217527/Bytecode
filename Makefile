@@ -29,7 +29,7 @@ COMPCERT_FILE_NAMES = \
 COMPCERT_FILES=$(COMPCERT_FILE_NAMES:%.v=$(COMPCERT_DIR)/%.v)
 
 PV_FILE_NAMES = \
-  Definition_and_soundness.v Completeness.v
+  Definition_and_soundness.v Completeness.v Soundness.v
   
 PV_FILES=$(PV_FILE_NAMES:%.v=$(PV_DIR)/%.v)
 

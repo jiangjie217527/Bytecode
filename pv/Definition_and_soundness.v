@@ -19,8 +19,9 @@ Module Definition_and_soundness.
 Module Wordsize_256.
   Definition wordsize := 256%nat.
   Remark wordsize_not_zero: wordsize <> 0%nat.
-  Proof. unfold wordsize; congruence. Qed.
+  Proof. unfold wordsize. congruence. Qed.
 End Wordsize_256.
+
 
 Strategy opaque [Wordsize_256.wordsize].
 Module Int256 := Make(Wordsize_256).
@@ -29,7 +30,7 @@ Notation int256 := Int256.int.
 
 (* Define syntax *)
 Module Lang.
-
+(*instructure 指令*)
 Inductive ins : Type :=
 | JUMPI 
 | JUMP
@@ -105,6 +106,7 @@ Record pc_state: Type := {
   pc: nat;
   state: program_state;
 }.
+Print program_state.
 
 End pc_state.
 
@@ -125,7 +127,8 @@ Notation "x '.(state)'" := (ltac:(any_state x)) (at level 1, only parsing).
 
 Module act_state.
 
-(* act_state is the type of the elements of the list of memory actions *)
+(* act_state is the type of the elements of the list of memory actions 
+内存操作的列表 的 元素 的类型*)
 Record act_state: Type := {
   pc: nat;
   state: program_state;
@@ -152,6 +155,7 @@ Ltac any_state x ::=
   | act_state => exact (act_state.state x)
   end.
 
+(*指令语意*)
 Definition ins_sem_triple: Type := 
   pc_state -> list act_state -> pc_state -> Prop.
 
@@ -164,6 +168,8 @@ Inductive POP_sem: nat -> pc_state -> list act_state -> pc_state -> Prop :=
       x.(state).(stack) = cons v z.(state).(stack) ->
       y.(state).(memory) = z.(state).(memory) ->
       POP_sem pc x (cons y nil) z.
+
+Print Datatypes.cons.
 
 (* ADD
 
@@ -338,6 +344,7 @@ Definition eval_ins (ins_pc:ins * nat): pc_state -> list act_state -> pc_state -
   | (PUSH32 v, index) => PUSH32_sem v index
   end.
 
+Print seq.
 Definition fold_ins_sem (l: list (ins * nat)): pc_state -> list act_state -> pc_state -> Prop :=
   fold_right
   Sets.union ∅ (map eval_ins l).
@@ -357,6 +364,7 @@ Inductive Increasing_timestamp: list act_state -> Prop :=
     y.(action).(timestamp) = x.(action).(timestamp) + 1 ->
     Increasing_timestamp (app l (cons x nil)) -> Increasing_timestamp (app (app l (cons x nil)) (cons y nil)).
 
+
 Inductive eval_ins_list: list ins -> pc_state -> list act_state -> pc_state -> Prop :=
 | sigma: forall (l: list ins)(x z: pc_state)(y: list act_state),
   x.(pc) = 0 ->
@@ -366,6 +374,7 @@ Inductive eval_ins_list: list ins -> pc_state -> list act_state -> pc_state -> P
   clos_refl_trans (eval_ins_list_single l) x y z ->
   eval_ins_list l x y z.
 
+Print clos_refl_trans.
 
 Inductive POP_constraint: CPU_state -> CPU_state -> Prop :=
 | pop_constraint:
@@ -455,6 +464,7 @@ Inductive adjacent_CPU_state (P : CPU_state -> CPU_state -> Prop) : list CPU_sta
 | adjacent_CPU_state_cons : forall (x y : CPU_state)(l : list CPU_state),
     P x y -> adjacent_CPU_state P (l ++ [x]) -> adjacent_CPU_state P (l ++ [x] ++ [y]).
 
+
 Inductive CPU_trace_constraint: list CPU_state -> Prop :=
 | trace_CPU: forall (CPU_trace rm_first_CPU_trace: list CPU_state)
   (first_CPU_state: CPU_state),
@@ -482,6 +492,8 @@ Inductive permutation_constraint: list action_type -> list action_type -> Prop :
   Permutation (filter mem_ins_type_is_not_non action_trace) memory_trace ->
   permutation_constraint action_trace memory_trace.
 
+Print filter.
+
 Inductive adjacent_CPU_state_for_action_trace (P : CPU_state -> CPU_state -> action_type -> Prop) : list CPU_state -> list action_type -> Prop :=
 | adjacent_CPU_state_for_action_trace_nil : forall(x: CPU_state), adjacent_CPU_state_for_action_trace P [x] nil
 | adjacent_CPU_state_for_action_trace_cons : forall (x y : CPU_state)(action : action_type)(l : list CPU_state)(l_action: list action_type),
@@ -496,7 +508,7 @@ Inductive action_trace_timestamp_constraint: list action_type -> Prop :=
     y.(timestamp) = x.(timestamp) + 1 ->
     action_trace_timestamp_constraint (app l [x]) -> action_trace_timestamp_constraint (app (app l [x]) [y]).
 
-
+(*flag*)
 Inductive Check_action: CPU_state -> CPU_state -> action_type -> Prop :=
 | check_read_action: forall (state next_state: CPU_state)(action: action_type)(address value: int256)(remaining_stack: list int256),
   state.(inst) = MLOAD -> action.(mem_ins) = read address value ->
@@ -671,6 +683,7 @@ Proof.
     tauto.
 Qed.
 
+(*如果两个list长度相同，那么b把他们combine起来之后长度和原来一样*)
 Lemma len_combine: forall {A B : Type} (l1 : list A) (l1' : list B),
 length l1 = length l1' -> length l1' = length (combine l1 l1').
 Proof.
@@ -678,7 +691,7 @@ Proof.
   remember (length l1') as ll1'.
   revert H. revert ll1' l1 l1'  Heqll1'.
   induction ll1'; intros.
-  - apply length_zero_iff_nil in H; subst.
+  - apply length_zero_iff_nil in H. subst.
     symmetry in Heqll1'. apply length_zero_iff_nil in Heqll1'; subst.
     tauto.
   - symmetry in H.
@@ -694,17 +707,24 @@ Proof.
     rewrite IHll1'.
     tauto.
 Qed.
+(*rev_ind是list相关的定理*)
+Print list.
+Print eq_ind.
+Print rev_ind.
+(*rev_ind貌似是对某一个list分类归纳*)
 
+(*list前面加内容则可以找到一个list后面加内容*)
 Lemma cons_app_eq: forall {A : Type} (x : A) (l : list A), exists y l', x :: l = l' ++ [y].
 Proof.
   intros.
   revert x.
-  apply rev_ind with (l := l); intros.
+  apply rev_ind with (l := l). intros.
   - exists x, []. reflexivity.
-  - exists x, (x0 :: l0). reflexivity.
+  - intros. exists x, (x0 :: l0). reflexivity.
 Qed.
 
-
+(*flag*)
+(*rm_last_CUP_trace比l长1*)
 Lemma action_CPU_trace_len_cons: forall (rm_last_CPU_trace: list CPU_state)(l: list action_type),
   action_trace_constraint rm_last_CPU_trace l -> length rm_last_CPU_trace = S (length l).
 Proof.
@@ -717,7 +737,9 @@ Proof.
     + tauto.
     + apply app_eq_nil in H1.
       inversion H1.
+      Print Check_action.
       discriminate.
+(*why*)
   - intros.
     destruct rm_last_CPU_trace as [|y l'] eqn:H1.
     + inversion H0.

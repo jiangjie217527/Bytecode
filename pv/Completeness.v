@@ -38,7 +38,34 @@ Proof.
   repeat split; try tauto.
 Qed.
 
-
+Lemma app_after_nil_1: forall {A: Type}(l : list A) (x y:A),(l ++ [x]) = [y] -> l = [] .
+Proof.
+  intros.
+   Search length (?l ++ ?[x]).
+     pose proof app_length.
+      specialize (H0 A l [x]).
+      rewrite H in H0.
+      simpl in H0.
+      assert (length l = 0).
+    {
+        lia.
+}
+      Search (length ?l = 0).
+      pose proof length_zero_iff_nil.
+      specialize(H2 A l).
+      destruct H2.
+      clear H3.
+      tauto.
+Qed.
+Lemma app_after_nil_2:forall {A: Type}(l : list A) (x y:A),(l ++ [x]) = [y] -> x=y.
+Proof.
+  intros.
+  pose proof app_after_nil_1 l x y H.
+  rewrite H0 in H.
+  simpl in H.
+  inversion H.
+  tauto.
+Qed.
 
 Lemma completeness_of_protocol: 
  forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace: list CPU_state)
@@ -54,13 +81,31 @@ Lemma completeness_of_protocol:
   (combine_to_pc_state last_CPU_state last_mem))
 -> constraints program CPU_trace action_trace memory_trace.
 Proof.
-  intros.
-  destruct H1 as [mem_list [first_mem [last_mem [H1 H2]]]].
+  intros program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace memory_trace.
+  revert program CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace memory_trace.
+  apply rev_ind with (l:=rm_first_CPU_trace).
+  + intros. subst.
+      symmetry in H0.
+      pose proof app_after_nil_1 rm_last_CPU_trace last_CPU_state first_CPU_state H0.
+      pose proof app_after_nil_2 rm_last_CPU_trace last_CPU_state first_CPU_state H0.
+      clear H0.  
+      split.
+      - destruct H1 as [mem_list [first_mem [last_mem [H1 H3]]]].
+
+
+
+
+
+
+
+
+
+
+
+
+  pose proof all_constraints.
+  inversion H.
   split.
-  remember (combine_to_pc_state first_CPU_state first_mem) as x.
-  remember (combine_to_act_state_list rm_last_CPU_trace mem_list action_trace) as y.
-  remember (combine_to_pc_state last_CPU_state last_mem) as z.
-  destruct H2 as [program].
    + apply trace_CPU with (rm_first_CPU_trace:=rm_first_CPU_trace) (first_CPU_state:=first_CPU_state).
     - tauto.
     - unfold combine_to_pc_state in *.

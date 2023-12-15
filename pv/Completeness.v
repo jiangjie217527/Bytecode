@@ -76,6 +76,29 @@ Proof.
       simpl in H4.
       tauto.
     - destruct H6 as[n ?].
+       rewrite H.
+        revert H CPU_trace  rm_first_CPU_trace rm_last_CPU_trace.
+
+       apply rev_ind with (l:=rm_first_CPU_trace).
+       * pose proof adjacent_CPU_state_nil.
+          specialize (H7 eval_constraint first_CPU_state).
+          tauto.
+       * intros.
+          pose proof adjacent_CPU_state_cons.
+          pose proof cons_app_eq first_CPU_state.
+          specialize(H9 l).
+          destruct H9 as [last_two_CPU_state [rm_last_two_CPU_trace]].
+          specialize (H8 eval_constraint last_two_CPU_state x0 (rm_last_two_CPU_trace)).
+          rewrite H9 in H7.
+          assert (eval_constraint last_two_CPU_state x0).
+          {
+             destruct last_two_CPU_state.
+             unfold eval_constraint.
+              simpl in *.
+              destruct inst0.
+              +  pose proof jumpi_constraint.
+                  specialize (H10 ({| CPU_state.pc := pc0; stack := stack0; inst := JUMPI |}) x0 )
+}.
 Admitted.
 
 (*      induction n.

@@ -57,6 +57,7 @@ Proof.
       clear H3.
       tauto.
 Qed.
+
 Lemma app_after_nil_2:forall {A: Type}(l : list A) (x y:A),(l ++ [x]) = [y] -> x=y.
 Proof.
   intros.
@@ -65,6 +66,17 @@ Proof.
   simpl in H.
   inversion H.
   tauto.
+Qed.
+
+Lemma app_last_corr:
+  forall [A : Type] (l l' : list A) (y y' : A),
+  l ++ [y] = l' ++ [y'] -> l = l' /\ y = y'.
+Proof.
+  intros.
+  inversion H.
+  split.
+    + apply app_inj_tail in H. tauto.
+    + apply app_inj_tail in H. tauto.
 Qed.
 
 Lemma completeness_of_protocol: 
@@ -89,13 +101,114 @@ Proof.
       pose proof app_after_nil_1 rm_last_CPU_trace last_CPU_state first_CPU_state H0.
       pose proof app_after_nil_2 rm_last_CPU_trace last_CPU_state first_CPU_state H0.
       clear H0.  
+      destruct H1 as [mem_list [first_mem [last_mem [H1 H3]]]].
+      inversion H3.
+      simpl in *.
       split.
-      - destruct H1 as [mem_list [first_mem [last_mem [H1 H3]]]].
+      - apply trace_CPU with (rm_first_CPU_trace:=[]) (first_CPU_state:=first_CPU_state).
+        * tauto.
+        * tauto.
+        * tauto.
+        * pose proof adjacent_CPU_state_nil eval_constraint first_CPU_state.
+          tauto.
+      - apply trace_multiset with (program := program) (CPU_trace:= [first_CPU_state]).
+        simpl.
+        rewrite H0.
+(*        destruct first_CPU_state as [? ? ?].*)
+        subst.
+          destruct program.
+          { 
+              simpl in *.
+              inversion H7.
+              
+            
+          assert (length program = 1).
+          {
+
+          }
+      - admit.
+      - admit.
+      - admit.
+      - admit.
+      - admit.
+  + intros x l H Program CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state  action_trace memory_trace.
+     pose proof cons_app_eq first_CPU_state l.
+    destruct H0 as [last_two_2_CPU_state [rm_last_two_2_CPU_trace ?]].
+      
+      split.
+      - rewrite H1.
+        
+  
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+      pose proof cons_app_eq first_CPU_state l.
+      destruct H0 as [last_two_2_CPU_state [rm_last_two_2_CPU_trace ?]].
+     specialize (H Program rm_last_CPU_trace rm_last_two_2_CPU_trace first_CPU_state last_two_2_CPU_state).
+      intros H1 H2 H3.
+      destruct H3 as[mem_list [first_mem [last_mem []]]].
+      inversion H4.
+      inversion H9.
+      rename x1 into n.
+      clear H9.
+      subst.
+      assert (exists (x:action_type) (l:list action_type),l ++ [x]=action_trace).
+      {
+          admit.
+      }
+      assert (exists (x:action_type) (l:list action_type),l ++ [x]=memory_trace).
+      {
+          admit.
+      }
+      destruct H1 as [last_action [rm_last_action_trace ?]].
+      destruct H9 as [last_memory [rm_last_memory_trace ?]].
+      specialize (H rm_last_action_trace rm_last_memory_trace).
+      pose proof app_last_corr (first_CPU_state :: l) rm_last_CPU_trace x last_CPU_state H2.
+      destruct H10.
+      symmetry in H10.
+      pose proof H10.
+      rewrite H0 in H12.
+      pose proof H H10 H12.
+      clear H.
+      destruct H13.
+      assert (exists (x:int256->int256)(l:list (int256->int256)),l++[x]=mem_list).
+      {
+          admit.
+      }
+      destruct H as [last_two_2_mem [rm_last_mem_list ?]].
+      - exists rm_last_mem_list,first_mem,last_two_2_mem.
+        split.
+        * admit.
+        *  apply sigma.
+          ++ tauto.
+          ++ tauto.
+          ++ tauto.
+          ++ pose proof ActionListCons.
+                admit.
+          ++ simpl.
+                assert (exists (n0:nat),S n0 = n).
+                {
+                  admit.
+                }
+                destruct H13 as [n0 ?].
+                exists n0.
+                Print one.
+                admit.
+      -
+
+(* ∀x∀l(()->())->∀P...(()->()) *)
 
 
 

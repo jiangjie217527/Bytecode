@@ -82,7 +82,7 @@ Qed.
 Lemma completeness_of_protocol: 
  forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace: list CPU_state)
   (first_CPU_state last_CPU_state: CPU_state)
-  (action_trace: list action_type)(memory_trace: list action_type),
+  (action_trace: list action_type),
   CPU_trace = cons first_CPU_state rm_first_CPU_trace ->
   CPU_trace = rm_last_CPU_trace ++ [last_CPU_state] ->
   (exists (mem_list: list (int256 -> int256))(first_mem last_mem: int256 -> int256),
@@ -91,19 +91,30 @@ Lemma completeness_of_protocol:
   (combine_to_pc_state first_CPU_state first_mem)
   (combine_to_act_state_list rm_last_CPU_trace mem_list action_trace)
   (combine_to_pc_state last_CPU_state last_mem))
--> constraints program CPU_trace action_trace memory_trace.
+->exists (memory_trace: list action_type), constraints program CPU_trace action_trace memory_trace.
 Proof.
-  intros program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace memory_trace.
-  revert program CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace memory_trace.
+  intros program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace.
+  revert program CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace.
+(*反向归纳*)
   apply rev_ind with (l:=rm_first_CPU_trace).
-  + intros. subst.
+  + intros program CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace H H0.
+        exists  (filter mem_ins_type_is_not_non action_trace).
+       subst.
       symmetry in H0.
       pose proof app_after_nil_1 rm_last_CPU_trace last_CPU_state first_CPU_state H0.
       pose proof app_after_nil_2 rm_last_CPU_trace last_CPU_state first_CPU_state H0.
-      clear H0.  
+      clear H0.
+      intros.
+(*
+在这里得到H : rm_last_CPU_trace = []
+H2 : last_CPU_state = first_CPU_state
+*)
       destruct H1 as [mem_list [first_mem [last_mem [H1 H3]]]].
       inversion H3.
+      clear H3.
       simpl in *.
+      Search combine.
+      Print combine.
       split.
       - apply trace_CPU with (rm_first_CPU_trace:=[]) (first_CPU_state:=first_CPU_state).
         * tauto.
@@ -114,12 +125,34 @@ Proof.
       - apply trace_multiset with (program := program) (CPU_trace:= [first_CPU_state]).
         simpl.
         rewrite H0.
-(*        destruct first_CPU_state as [? ? ?].*)
+        Print In.
+        destruct first_CPU_state as [? ? ?].
         subst.
-          destruct program.
-          { 
+         destruct inst0.
+          ++
               simpl in *.
+              Print Rels.RELS_ID.
+              unfold combine_to_act_state_list in *.
+              simpl in *.
+              clear H6.
+              (pose proof Definition_and_soundness.one program [] 
+(combine_to_pc_state {| CPU_state.pc := pc0; stack := stack0; inst := JUMPI |} (fun _ : int256 => zero)) 
+(combine_to_pc_state {| CPU_state.pc := pc0; stack := stack0; inst := JUMPI |} last_mem) ).
+              unfold nsteps in H7.
+              destruct H7 as [n ?].
+              destruct n.
+              Print nsteps.
+              simpl in H2.
+
+
+
+              unfold fold_ins_sem,fold_right in H.
+              simpl in H.
               inversion H7.
+              unfold combine_to_pc_state in H7.
+              simpl in H7.
+              inversion H7.
+              discriminate.
               
             
           assert (length program = 1).

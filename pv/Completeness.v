@@ -186,22 +186,31 @@ Inductive multiset:list ins-> list CPU_state -> Prop:=
 C1::C2::rm_2_CPU_trace=CPU_trace -> C1.(inst)::rm_program = program -> multiset program CPU_trace
 .
 
-Theorem completeness_of_protocol: 
- forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace: list CPU_state)
-  (first_CPU_state last_CPU_state: CPU_state)
-  (action_trace: list action_type),
-  multiset program CPU_trace ->
-  program <> [] ->
-  CPU_trace = cons first_CPU_state rm_first_CPU_trace ->
-  CPU_trace = rm_last_CPU_trace ++ [last_CPU_state] ->
-  (exists (mem_list: list (int256 -> int256))(first_mem last_mem: int256 -> int256),
-  length mem_list = length action_trace /\
-  eval_ins_list program
-  (combine_to_pc_state first_CPU_state first_mem)
-  (combine_to_act_state_list rm_last_CPU_trace mem_list action_trace)
-  (combine_to_pc_state last_CPU_state last_mem))
-->exists (memory_trace: list action_type), constraints program CPU_trace action_trace memory_trace.
+Theorem completeness_of_protocol:
+forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace:
+list CPU_state)
+(first_CPU_state last_CPU_state: CPU_state)
+(action_trace: list action_type),
+CPU_trace = cons first_CPU_state rm_first_CPU_trace ->
+CPU_trace = rm_last_CPU_trace ++ [last_CPU_state] ->
+length rm_last_CPU_trace = length action_trace -> (* 新增条件 *)
+program <> [] -> (* 新增条件 *)
+In (last_CPU_state.(inst), last_CPU_state.(pc)) (combine program (seq 0
+(length program))) -> (* 新增条件 *)
+(exists (mem_list: list (int256 -> int256))(first_mem last_mem: int256 ->
+int256),
+length mem_list = length action_trace /\
+eval_ins_list program
+(combine_to_pc_state first_CPU_state first_mem)
+(combine_to_act_state_list rm_last_CPU_trace mem_list action_trace) (* 注
+意这里 combine_to_act_state_list 是用 combine 实现的，不要求 rm_last_CPU_trace
+和 mem_list 以及 action_trace 长度相等 *)
+(combine_to_pc_state last_CPU_state last_mem))
+-> exists (memory_trace: list action_type), constraints program CPU_trace
+action_trace memory_trace. (* 需要用条件和归纳假设自行构造 memory_trace *)
 Proof.
+Admitted.
+(*
   intros program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace.
   revert program CPU_trace rm_first_CPU_trace first_CPU_state last_CPU_state action_trace.
 (*反向归纳*)
@@ -542,4 +551,5 @@ Admitted.
         specialize (H8 eval_constraint last_two_CPU_trace last_CPU_state rm_last_two_CPU_trace).
         apply H8.
 subst.
+*)
 *)

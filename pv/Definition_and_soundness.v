@@ -426,7 +426,6 @@ Inductive JUMPI_constraint: CPU_state -> CPU_state -> Prop :=
       JUMPI_constraint x y.
 
 Inductive MLOAD_constraint: CPU_state -> CPU_state -> Prop :=
-Inductive MLOAD_constraint: CPU_state -> CPU_state -> Prop :=
 | mload_constraint:
     forall (x y: CPU_state)(offset value: int256)(l: list int256),
       y.(pc) = x.(pc) + 1 ->
@@ -5074,8 +5073,12 @@ Proof.
             destruct H30.
             apply app_eq_nil in H30.
             destruct H30.
-            inversion H31. clear H27 H28 x0 y.
+            inversion H31.
+discriminate.
+(*flag
+           clear H27 H28 x0 y.
             clear H26 H25 offset value0.
+*)
           }
           {
             destruct H30.

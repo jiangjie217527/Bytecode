@@ -1,4 +1,3 @@
-
 Require Import Coq.ZArith.ZArith.
 Require Import Coq.Strings.String.
 Require Import Coq.Vectors.Vector.
@@ -209,8 +208,6 @@ eval_ins_list program
 -> exists (memory_trace: list action_type), constraints program CPU_trace
 action_trace memory_trace. (* 需要用条件和归纳假设自行构造 memory_trace *)
 Proof.
-Admitted.
-(*
   intros program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace.
   revert program CPU_trace rm_first_CPU_trace first_CPU_state last_CPU_state action_trace.
 (*反向归纳*)
@@ -218,18 +215,25 @@ Admitted.
   + intros;simpl in *.
       subst.
       exists [].
-(*以下化简rm_first=[]*)
       inversion H1;clear H1.
-      destruct H2 as [mem_list [first_mem [last_mem [H1 ?]]]].
+      destruct H4 as [mem_list [first_mem [last_mem [H1 ?]]]].
       inversion H0;clear H0.
-      inversion H2;clear H2.
-      inversion H6;clear H6.
-      inversion H7;clear H7.
-      inversion H8;clear H8.
-      unfold combine_to_pc_state,Definition_and_soundness.Build_pc_state,Definition_and_soundness.Build_program_state in H5.
-      simpl in H5.
+      inversion H;clear H.
       subst.
+      unfold combine_to_pc_state,Definition_and_soundness.Build_pc_state,Definition_and_soundness.Build_program_state in H10.
+      simpl in H10.
+      pose proof length_zero_iff_nil action_trace.
+      destruct H.
+      symmetry in H5.
+      pose proof H H5.
+      clear H H6 H5.
+      unfold combine_to_pc_state in H8.
+      unfold Definition_and_soundness.Build_program_state,Definition_and_soundness.Build_pc_state in H8.
+      simpl in H8.
+      unfold Definition_and_soundness.combine_to_pc_state in H4.
+      simpl in H4.
       subst.
+      (*通过化简得到很多都是空的*)
       split.
       - apply trace_CPU with (rm_first_CPU_trace:=[]) (first_CPU_state:=last_CPU_state).
         * tauto.
@@ -237,8 +241,165 @@ Admitted.
         * tauto.
         * apply adjacent_CPU_state_nil.
       - apply trace_multiset with (program:= program) (CPU_trace:= [last_CPU_state]).
-        
-        destruct x0.
+        destruct program.
+        * contradiction.
+        * simpl in *.
+          right.
+          ++ tauto.
+          ++ apply Forall_nil.
+      - apply ActionListTraceNil.
+      - apply trace_action with (CPU_trace:=[last_CPU_state]) (action_trace:=[]).
+        apply adjacent_CPU_state_for_action_trace_nil with (x:= last_CPU_state).
+      - apply permutation with (action_trace:=[])(memory_trace:=[]).
+        simpl.
+        apply perm_nil.
+      - apply trace_momory_nil.
+      - apply public with (program:= program)(CPU_trace:= [last_CPU_state])(action_trace:=[])(memory_trace:=[]).
+  + intros.
+     subst.
+     pose proof cons_eq x l.
+     destruct H0 as [? [rm_first_last_CPU_trace ?]].
+     rewrite H0 in H1.
+     inversion H1;clear H1.
+     symmetry in H7.
+     subst.
+     rename x into rm_last_two_2_CPU_state.
+     specialize (H program (l ++ [rm_last_two_2_CPU_state]) rm_first_last_CPU_trace first_CPU_state rm_last_two_2_CPU_state).
+     pose proof last_length l  rm_last_two_2_CPU_state .
+     rewrite H1 in H2;clear H1.
+     assert (exists (rm_last_action_trace:list action_type)(a:action_type), rm_last_action_trace++[a]=action_trace
+/\Datatypes.length l = Datatypes.length rm_last_action_trace).
+{
+     destruct action_trace.
+     simpl in H2.
+     + inversion H2.
+     + pose proof cons_app_eq a action_trace.
+        destruct H1 as [ls [rm_ls ?]].
+        exists rm_ls,ls.
+        symmetry in H1.
+        split.
+        - tauto.
+        - rewrite <- H1 in H2.
+          Search (length (?l ++ ?x)).
+          pose proof last_length rm_ls ls.
+          rewrite H6 in H2;clear H6.
+          lia.
+}
+     destruct H1 as[rm_last_action_trace [last_action_trace [? ?]]].
+     specialize (H rm_last_action_trace).
+     pose proof H H0 (ltac:(tauto)).
+     pose proof H7 H6 H3.
+     clear H H7.
+     destruct H5 as  [mem_list [first_mem [last_mem [H9 H10]]]].
+     inversion H10;clear H10.
+     subst.
+     inversion H11;clear H11.
+     inversion H12;clear H12.
+     unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H10.
+     unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H1.
+     pose proof cons_eq rm_last_two_2_CPU_state l .
+     pose proof cons_eq last_action_trace rm_last_action_trace.
+     destruct H11 as [first [last_two ?]].
+     destruct H12 as [firsxt_ [rm_first ?]].
+     - destruct mem_list.
+       * inversion H9. 
+          rewrite H12 in H14.
+          inversion H14.
+      * rewrite H11 in H10.
+         rewrite H12 in H10.
+         inversion H10.
+    - unfold combine_to_act_state_list in H1.
+      pose proof cons_eq rm_last_two_2_CPU_state l .
+      pose proof cons_eq last_action_trace rm_last_action_trace.
+      destruct H11 as [first [last_two ?]].
+      destruct H13 as [first_ [rm_first ?]].
+      rewrite H11 in H1.
+      rewrite H13 in H1.
+      simpl in H1.
+      destruct mem_list.
+      * inversion H1.
+      * inversion H1;clear H1.
+         rewrite  H0 in H11.
+         inversion H11;clear H11.
+         subst.
+         destruct mem_list.
+         ++ inversion H9;clear H9.
+               pose proof length_one_iff_single (rm_last_action_trace ++ [last_action_trace]).
+               destruct H1.
+               clear H9.
+               symmetry in H11.
+               pose proof H1 H11;clear H1.
+               destruct H9.
+               pose proof app_after_nil_1 rm_last_action_trace.
+               specialize (H9 last_action_trace x).
+               pose proof H9 H1;clear H1 H9.
+               rewrite H11 in H2.
+               destruct l.
+               -- subst.
+                  simpl in H12.
+                  inversion H12.
+                  destruct x0.
+                  ** simpl in H1;sets_unfold in H1;destruct H1.
+                      unfold combine_to_act_state_list in H1.
+                      inversion H1.
+                  ** simpl in H1;sets_unfold in H1.
+                      destruct H1 as [i0 [i1[i2 [? [? ?]]]]].
+                      pose proof Definition_and_soundness.one program i1  (combine_to_pc_state first first_mem)  i0.
+                      destruct H15.
+                      +++ 
+                  admit.
+               -- inversion H2. (*q.e.d*)
+               destruct last_action_trace.
+               destruct mem_ins0.
+               -- exists [{| timestamp := timestamp0; mem_ins := read address value |}].
+                  split.
+               
+               pose proof cons_eq last_action_trace rm_last_action_trace .
+               destruct H9 as [y [l' ?]].
+               rewrite H9 in H1.
+               inversion H1;clear H1.
+               subst.
+ unfold combine in H10.
+          simpl in H10.
+     simpl in H12.
+     rename H12 into H1.
+     destruct H1 as [n ?].
+     destruct n.
+     - simpl in H1.
+       sets_unfold in H1.
+       destruct H1.
+       unfold combine_to_act_state_list,combine_to_act_state in H1.
+       simpl in H1.
+     assert (In (rm_last_two_2_CPU_state.(inst), rm_last_two_2_CPU_state.(pc))
+       (combine program (seq 0 (Datatypes.length program)))).
+{
+     
+}
+ (*接下来已知最后一个可达，证明倒数第二个也可达*)
+     pose proof H8 
+     inversion H6.
+     assert(exists m:list action_type, filter mem_ins_type_is_not_non m = m /\ Permutation m action_trace /\ increase_mem_trace m).
+{
+  exists (filter mem_ins_type_is_not_non action_trace).
+  apply rev_ind with (l := action_trace).
+  + simpl;tauto.
+  + intros.
+      pose proof filter_cons_app mem_ins_type_is_not_non l [x].
+      rewrite H0.
+      pose proof filter_cons_app mem_ins_type_is_not_non (filter mem_ins_type_is_not_non l) (filter mem_ins_type_is_not_non [x]).
+      rewrite H1.
+      rewrite H.
+     destruct x.
+     destruct mem_ins0.
+      - tauto.
+      - tauto.
+      - tauto.
+}
+          tauto.
+        simpl.
+        unfold In.
+        simpl.
+        tauto.
         * unfold combine_to_act_state_list in H0.
            simpl in H0.
            unfold combine_to_pc_state in H0.
@@ -312,23 +473,7 @@ unfold combine_to_act_state_list in H0.
   revert program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state.
   destruct H as [memory_trace ?].
 
-  assert(exists m:list action_type, filter mem_ins_type_is_not_non m = m /\ Permutation m action_trace /\ increase_mem_trace m).
-{
-  exists (filter mem_ins_type_is_not_non action_trace).
-  apply rev_ind with (l := action_trace).
-  + simpl;tauto.
-  + intros.
-      pose proof filter_cons_app mem_ins_type_is_not_non l [x].
-      rewrite H0.
-      pose proof filter_cons_app mem_ins_type_is_not_non (filter mem_ins_type_is_not_non l) (filter mem_ins_type_is_not_non [x]).
-      rewrite H1.
-      rewrite H.
-     destruct x.
-     destruct mem_ins0.
-      - tauto.
-      - tauto.
-      - tauto.
-}
+
 
 
 
@@ -551,5 +696,4 @@ Admitted.
         specialize (H8 eval_constraint last_two_CPU_trace last_CPU_state rm_last_two_CPU_trace).
         apply H8.
 subst.
-*)
 *)

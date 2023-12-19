@@ -51,7 +51,7 @@ Proof.
     inversion H0. subst.
     inversion H8. symmetry in H13, H14. subst. clear H8.
     (* CPU_trace should be a single value list; adjacent_CPU_state_for_action_trace has two constructors *)
-    inversion H4. subst. inversion H8; subst.
+    inversion H4. subst. inversion H8. subst.
     + symmetry in H1. apply app_eq_unit in H1. inversion H1. clear H1.
       { inversion H12. clear H12. subst. inversion H13. subst. clear H13.
         unfold combine_to_act_state_list. exists nil. simpl. (* mem_list = [] *)
@@ -290,7 +290,8 @@ Proof.
             destruct H30.
             apply app_eq_nil in H30.
             destruct H30.
-            discriminate.
+            inversion H31. clear H27 H28 x0 y.
+            clear H26 H25 offset value0.
           }
           {
             destruct H30.
@@ -1056,3 +1057,5 @@ Proof.
       apply H13 in H18. apply H18.
     }
 Qed.
+
+

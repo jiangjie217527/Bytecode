@@ -349,6 +349,8 @@ Definition fold_ins_sem (l: list (ins * nat)): pc_state -> list act_state -> pc_
   fold_right
   Sets.union ∅ (map eval_ins l).
 
+Print fold_right.
+
 (* [[c_0]] (0) U [[c_1]] (1) U ... U [[c_{n-1}]] (n-1) *)
 Inductive eval_ins_list_single: list ins -> pc_state -> list act_state -> pc_state -> Prop :=
 | one: forall (l: list ins)(y: list act_state)(x z: pc_state),
@@ -424,10 +426,12 @@ Inductive JUMPI_constraint: CPU_state -> CPU_state -> Prop :=
       JUMPI_constraint x y.
 
 Inductive MLOAD_constraint: CPU_state -> CPU_state -> Prop :=
+Inductive MLOAD_constraint: CPU_state -> CPU_state -> Prop :=
 | mload_constraint:
-    forall (x y: CPU_state)(offset value: int256),
+    forall (x y: CPU_state)(offset value: int256)(l: list int256),
       y.(pc) = x.(pc) + 1 ->
-      cons value x.(stack) = cons offset y.(stack) ->
+      x.(stack) = cons offset l ->
+      y.(stack) = cons value l ->
       MLOAD_constraint x y.
 
 Inductive MSTORE_constraint: CPU_state -> CPU_state -> Prop :=
@@ -5070,7 +5074,8 @@ Proof.
             destruct H30.
             apply app_eq_nil in H30.
             destruct H30.
-            discriminate.
+            inversion H31. clear H27 H28 x0 y.
+            clear H26 H25 offset value0.
           }
           {
             destruct H30.

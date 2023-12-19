@@ -1,3 +1,4 @@
+
 Require Import Coq.ZArith.ZArith.
 Require Import Coq.Strings.String.
 Require Import Coq.Vectors.Vector.
@@ -79,10 +80,118 @@ Proof.
     + apply app_inj_tail in H. tauto.
 Qed.
 
-Lemma completeness_of_protocol: 
+Lemma cons_eq: forall {A : Type} (x : A) (l : list A), exists y l',  l ++ [x] = y:: l'.
+Proof.
+  intros.
+  revert x.
+  induction l. intros.
+  - exists x, []. reflexivity.
+  - intros. exists a, (l++[x]). reflexivity.
+Qed.
+
+Lemma filter_cons_app_single:
+  forall [A: Type] (P : A -> bool) (l: list A) (x:A),
+  filter P (l++[x]) = (filter P l) ++ (filter P [x]).
+Proof.
+  Print filter.
+  induction l.
+  + simpl.
+   tauto.
+  + simpl.
+   intros.
+   assert(a :: filter P (l ++ [x]) = a :: filter P l ++ (if P x then [x] else [])).
+   { 
+    specialize (IHl x).
+    rewrite IHl.
+    simpl.
+    tauto.
+  }
+    assert(filter P (l ++ [x]) =filter P l ++ (if P x then [x] else [])).
+   { 
+    specialize (IHl x).
+    rewrite IHl.
+    simpl.
+    tauto.
+  }
+  rewrite H.
+  rewrite H0.
+  destruct (P a).
+  - tauto.
+  - tauto.
+Qed.
+
+Lemma filter_cons_app:
+  forall [A: Type] (P : A -> bool) (l l': list A) ,
+  filter P (l++l') = (filter P l) ++ (filter P l').
+Proof.
+  intros.
+  apply rev_ind with (l:= l').
+  + simpl. 
+     pose proof app_nil_r l.
+     pose proof app_nil_r (filter P l).
+     rewrite H.
+     rewrite H0.
+     tauto.
+  + intros.
+      pose proof  filter_cons_app_single P l0 x.
+      rewrite H0.
+      pose proof app_assoc (filter P l) (filter P l0)(filter P [x]).
+      rewrite H1.
+      rewrite <- H.
+      pose proof app_assoc (l) (l0)([x]).
+      rewrite H2.
+      pose proof filter_cons_app_single P (l ++ l0) x.
+      rewrite H3.
+      tauto.
+Qed.
+
+Print Permutation.
+
+Definition f :=
+  fix f (l : list action_type):list action_type:=
+  match l with
+  | [] => []
+  | x::l0 => f l0
+  end.
+Print f.
+
+Inductive increase_mem_trace:list action_type-> Prop:=
+| nil_increase: increase_mem_trace nil
+| single_increase: forall (m:list action_type), length m = 1 -> increase_mem_trace m
+| multi_increase_read_to_read: forall (m:list action_type) (m0 m1: action_type) (m': list action_type)
+( add0  add1  val0  val1:int256),
+  m0::(m1::m') = m -> m0.(mem_ins) = read add0  val0 -> m1.(mem_ins) = read  add1 val1
+  -> (Int256.unsigned add0 <= Int256.unsigned add1)%Z -> ((Int256.unsigned add0 = Int256.unsigned add1)%Z -> m0.(timestamp) < m1.(timestamp))
+  -> increase_mem_trace m
+| multi_increase_read_to_write: forall (m:list action_type) (m0 m1: action_type) (m': list action_type)
+( add0  add1  val0  val1:int256),
+  m0::(m1::m') = m -> m0.(mem_ins) = write add0  val0 -> m1.(mem_ins) = read  add1 val1
+  -> (Int256.unsigned add0 <= Int256.unsigned add1)%Z -> ((Int256.unsigned add0 = Int256.unsigned add1)%Z-> m0.(timestamp) < m1.(timestamp))
+  -> increase_mem_trace m
+| multi_increase_write_to_read: forall (m:list action_type) (m0 m1: action_type) (m': list action_type)
+( add0  add1  val0  val1:int256),
+  m0::(m1::m') = m -> m0.(mem_ins) = read add0  val0 -> m1.(mem_ins) = write add1 val1
+  -> (Int256.unsigned add0 <= Int256.unsigned add1)%Z -> ((Int256.unsigned add0 = Int256.unsigned add1)%Z -> m0.(timestamp) < m1.(timestamp))
+  -> increase_mem_trace m
+| multi_increase_write_to_write: forall (m:list action_type) (m0 m1: action_type) (m': list action_type)
+( add0  add1  val0  val1:int256),
+  m0::(m1::m') = m -> m0.(mem_ins) = write add0  val0 -> m1.(mem_ins) = write  add1 val1
+  -> (Int256.unsigned add0 <= Int256.unsigned add1)%Z -> ((Int256.unsigned add0 = Int256.unsigned add1)%Z -> m0.(timestamp) < m1.(timestamp))
+  -> increase_mem_trace m
+.
+
+Inductive multiset:list ins-> list CPU_state -> Prop:=
+| halt: forall (CPU_trace:list CPU_state) (program:list ins), length CPU_trace = 1 -> program = []->multiset program CPU_trace
+| run: forall (CPU_trace rm_2_CPU_trace:list CPU_state) (program rm_program:list ins) (C1 C2:CPU_state), 
+C1::C2::rm_2_CPU_trace=CPU_trace -> C1.(inst)::rm_program = program -> multiset program CPU_trace
+.
+
+Theorem completeness_of_protocol: 
  forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace: list CPU_state)
   (first_CPU_state last_CPU_state: CPU_state)
   (action_trace: list action_type),
+  multiset program CPU_trace ->
+  program <> [] ->
   CPU_trace = cons first_CPU_state rm_first_CPU_trace ->
   CPU_trace = rm_last_CPU_trace ++ [last_CPU_state] ->
   (exists (mem_list: list (int256 -> int256))(first_mem last_mem: int256 -> int256),
@@ -94,10 +203,127 @@ Lemma completeness_of_protocol:
 ->exists (memory_trace: list action_type), constraints program CPU_trace action_trace memory_trace.
 Proof.
   intros program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace.
-  revert program CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace.
+  revert program CPU_trace rm_first_CPU_trace first_CPU_state last_CPU_state action_trace.
 (*反向归纳*)
-  apply rev_ind with (l:=rm_first_CPU_trace).
-  + intros program CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace H H0.
+  apply rev_ind with (l:=rm_last_CPU_trace).
+  + intros;simpl in *.
+      subst.
+      exists [].
+(*以下化简rm_first=[]*)
+      inversion H1;clear H1.
+      destruct H2 as [mem_list [first_mem [last_mem [H1 ?]]]].
+      inversion H0;clear H0.
+      inversion H2;clear H2.
+      inversion H6;clear H6.
+      inversion H7;clear H7.
+      inversion H8;clear H8.
+      unfold combine_to_pc_state,Definition_and_soundness.Build_pc_state,Definition_and_soundness.Build_program_state in H5.
+      simpl in H5.
+      subst.
+      subst.
+      split.
+      - apply trace_CPU with (rm_first_CPU_trace:=[]) (first_CPU_state:=last_CPU_state).
+        * tauto.
+        * tauto.
+        * tauto.
+        * apply adjacent_CPU_state_nil.
+      - apply trace_multiset with (program:= program) (CPU_trace:= [last_CPU_state]).
+        
+        destruct x0.
+        * unfold combine_to_act_state_list in H0.
+           simpl in H0.
+           unfold combine_to_pc_state in H0.
+           unfold Definition_and_soundness.Build_program_state,Definition_and_soundness.Build_pc_state in H0.
+           sets_unfold in H0.
+           inversion H0;clear H0.
+           inversion H4;clear H4.
+
+
+        destruct program.
+        ++ contradiction.
+        ++ destruct i.
+              -- simpl.
+                 right.
+                 ** left.
+
+unfold combine_to_act_state_list in H0.
+           simpl in H0.
+           unfold combine_to_pc_state in H0.
+           unfold Definition_and_soundness.Build_program_state,Definition_and_soundness.Build_pc_state in H0.
+           destruct x0.
+           ++
+            admit.
+           ++ simpl in H0. 
+                 sets_unfold in H0.
+                 destruct H0 as[x [y [z []]]].
+                  Search (?l = []).
+                 pose proof app_eq_nil y z H0;clear H0 H.
+                 destruct H4; subst.
+                 destruct H3.
+                 inversion H;clear H;subst.
+                 unfold fold_ins_sem in H3.
+                 simpl in H3.
+                 sets_unfold in H3.
+                 inversion H3;clear H3.
+                 -- destruct i;inversion H.
+                 -- unfold fold_right in H.
+                     rewrite H2,H13 in H.
+                     unfold eval_ins in H.
+                     destruct program;inversion H.
+                     ** destruct i0;inversion H3.
+                     **
+                        
+                    simpl in H.
+                     
+                  Print nsteps.
+(*
+                 pose proof Definition_and_soundness.one (i :: program) [] ({|
+        pc_state.pc := last_CPU_state.(pc);
+        pc_state.state :=
+          {|
+            memory := fun _ : int256 => zero;
+            program_state.stack := last_CPU_state.(stack)
+          |}
+      |}) x.
+*)
+                  H0.
+            inversion H3;clear H3.
+
+            subst.
+            
+            
+
+
+
+
+
+
+  +
+  intros program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace.
+  revert program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state.
+  destruct H as [memory_trace ?].
+
+  assert(exists m:list action_type, filter mem_ins_type_is_not_non m = m /\ Permutation m action_trace /\ increase_mem_trace m).
+{
+  exists (filter mem_ins_type_is_not_non action_trace).
+  apply rev_ind with (l := action_trace).
+  + simpl;tauto.
+  + intros.
+      pose proof filter_cons_app mem_ins_type_is_not_non l [x].
+      rewrite H0.
+      pose proof filter_cons_app mem_ins_type_is_not_non (filter mem_ins_type_is_not_non l) (filter mem_ins_type_is_not_non [x]).
+      rewrite H1.
+      rewrite H.
+     destruct x.
+     destruct mem_ins0.
+      - tauto.
+      - tauto.
+      - tauto.
+}
+
+
+
+ intros program CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace H H0.
         exists  (filter mem_ins_type_is_not_non action_trace).
        subst.
       symmetry in H0.

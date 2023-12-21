@@ -325,26 +325,33 @@ Proof.
   apply rev_ind with (l:=rm_last_CPU_trace).
   + intros;simpl in *.
       subst.
-      exists [].
-      inversion H1;clear H1.
+      exists []. (*显然在程序没有运行的时候，memory_trace=[]*)
+      inversion H1;clear H1. (*只是把这个前提拿到下面来方便处理*)
+      (*对于H4,即程序能正常运行，将其中的mem_list拆解出来，mem_list只在该条件中有约束,其他地方无法看出mem_list跟acition_trace中memory的关系*)
       destruct H4 as [mem_list [first_mem [last_mem [H1 ?]]]].
+      (*得到第一个等于最后一个的前提*)
       inversion H0;clear H0.
-      inversion H;clear H.
-      subst.
-      unfold combine_to_pc_state,Definition_and_soundness.Build_pc_state,Definition_and_soundness.Build_program_state in H10.
-      simpl in H10.
+      (*化简程序正常运行的条件，必须用inversion*)
+      inversion H;clear H ; subst.
+      (*=======================================*)
+      (*--------------这一段由action_trace长度为0导出action_trace为空----------------*)
       pose proof length_zero_iff_nil action_trace.
       destruct H.
       symmetry in H5.
       pose proof H H5.
       clear H H6 H5.
+      (*-----------------------action_trace为空证明结束------------------------------------------*)
+      (*--------------------------------以下化简得到last_CPU_state.(stack) = [] ----------*)
       unfold combine_to_pc_state in H8.
       unfold Definition_and_soundness.Build_program_state,Definition_and_soundness.Build_pc_state in H8.
       simpl in H8.
+      (*------------------------------化简完成-------------------------------------------*)
+      (*--------------------------------以下化简得到first_mem = (fun _ : int256 => zero) ----------*)
       unfold Definition_and_soundness.combine_to_pc_state in H4.
       simpl in H4.
       subst.
-      (*通过化简得到很多都是空的*)
+      (*化简完成，通过化简得到很多都是空的。这几个初始条件的化简在后面也会经常用到*)
+      (*================以下对于约束分开讨论==============*)
       split.
       - apply trace_CPU with (rm_first_CPU_trace:=[]) (first_CPU_state:=last_CPU_state).
         * tauto.
@@ -366,20 +373,33 @@ Proof.
         apply perm_nil.
       - apply trace_momory_nil.
       - apply public with (program:= program)(CPU_trace:= [last_CPU_state])(action_trace:=[])(memory_trace:=[]).
+      (*============由于是初始情况，都挺简单的===============*)
   + intros.
      subst.
+     (*------改个名字，符合实际--------*)
      rename l into rm_last_two_CPU_trace.
      rename x into last_two_2_CPU_state.
+     (*--------改完了------*)
+     (*----------------------------------把CPU_trace细分-----------------*)
      pose proof cons_eq last_two_2_CPU_state rm_last_two_CPU_trace.
      destruct H0 as [? [rm_first_last_CPU_trace ?]].
      rewrite H0 in H1.
      inversion H1;clear H1.
      symmetry in H7.
      subst.
-    
-     specialize (H program (rm_last_two_CPU_trace ++ [last_two_2_CPU_state]) rm_first_last_CPU_trace first_CPU_state last_two_2_CPU_state).
+     clear rm_last_CPU_trace.
+    (*完整程序的CPU_trace表达方式现在有：
+    1. first_CPU_state :: rm_first_last_CPU_trace ++[last_CPU_state]
+    2. rm_last_two_CPU_trace ++ [last_two_2_CPU_state] ++ [last_CPU_state]
+    3. 按道理还可以用rm_last_CPU_trace,但是现在rm_last_CPU_trace可以用rm_first_last_CPU_trace ++[last_CPU_state]表示，所以这个变量已经没有用了*)
+    (*------------------------细分完毕----------------------*)
+    (*--------------------------------把action_trace细分----------------------*)
+     (*-----------以下根据action_trace的长度是等于rm_last_CPU_trace的长度，得出action_trace一定可以拆出一个action*)
      pose proof last_length rm_last_two_CPU_trace  last_two_2_CPU_state .
      rewrite H1 in H2;clear H1.
+     pose proof len_succ action_trace (Datatypes.length rm_last_two_CPU_trace) H2.
+                    (*这个assert证明确实能拆,但其实有lemma可以直接用,太神奇辣（气）*)
+                    (*
      assert (exists (rm_last_action_trace:list action_type)(a:action_type), rm_last_action_trace++[a]=action_trace
 /\Datatypes.length rm_last_two_CPU_trace = Datatypes.length rm_last_action_trace).
 {
@@ -398,21 +418,71 @@ Proof.
           rewrite H6 in H2;clear H6.
           lia.
 }
-     destruct H1 as[rm_last_action_trace [last_action [? ?]]];clear H2.
-     specialize (H rm_last_action_trace).
-     pose proof H H0 (ltac:(tauto)) H6 H3;     clear H. (*H2就是原本的归纳条件*)
-(*上面两行完成对归纳条件的初步化简*)
-     inversion H5;clear H5.
-     rename x into mem_list.
-     destruct H as  [first_mem [last_mem [H9 H10]]].
-     inversion H10;clear H10.
-     subst.
+*)
+     destruct H1 as[first_action [rm_first_action_trace ?]];subst.
+     pose proof cons_app_eq first_action rm_first_action_trace.
+     destruct H1 as [last_action [rm_last_action_trace ?]].
+     simpl in H2.
+     inversion H2;clear H2.
+     
+     (*--------------------------------化简替换完毕------------------------------*)
+     (*这里化简完后，不存在action_trace,表示方式是
+     1. rm_last_action_trace ++ [last_action]
+     2. first_action :: rm_first_action_trace*)
+     
+     (*-----------------------化简前提假设------------------------*)
+     (*对归纳得到的前提假设稍微化简，把需要的变量和前提填进去（按照已经有的）*)
+     specialize (H program (rm_last_two_CPU_trace ++ [last_two_2_CPU_state]) rm_first_last_CPU_trace first_CPU_state last_two_2_CPU_state rm_last_action_trace).
+     assert (Datatypes.length rm_first_action_trace = Datatypes.length rm_last_action_trace).
+     {
+        assert (length (first_action :: rm_first_action_trace) =
+   length (rm_last_action_trace ++ [last_action])).
+          {
+            rewrite H1.
+            tauto.
+          }
+          simpl in H2.
+          pose proof last_length rm_last_action_trace last_action.
+          rewrite H6 in H2.
+          inversion H2.
+          tauto.
+     }
+     pose proof H2.
+     rewrite <- H7 in H2.
+     pose proof H H0 (ltac:(tauto)) H2 H3;clear H.
+(*------------------完成对归纳条件的初步化简,下一步-----------------------*)
+(*下一步期望得到倒数第二个CPU_state确实是合法的*)
+    (*-----------------------首先还是把程序满足soundness给化简一下------------------*)
+     pose proof H5;clear H5. (*这一步给它拿到下面来看*)
+     destruct H as  [mem_list[first_mem [last_mem [H9 H10]]]].
+     (*拆出两个条件：
+     1. mem_list长度和action_trace长度一样
+     2. 第一步到最后一步满足语意*)
+     inversion H9;clear H9.
+     inversion H10;clear H10;     subst.
+     (*-=-==-=-=-=-=-=-=化简初始条件*)
+     inversion H;clear H.
+     unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H9.
+     inversion H9;clear H9.
+     simpl in H.
+     unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H11.
      inversion H11;clear H11.
-     (*在此之前先处理mem_list的长度问题*)
+     subst.
+     (*-=-=-=-=-=-=-=-=初始条件化简完成*)
+     (*处理mem_list的长度问题,因为比较简单，由mem_list长度不为1,则mem_list也可以拆出两种表示方式*)
+     (*----------------------------由于这里代码复用了，所以考虑Lemma-----------------------*)
+     symmetry in H5.
+     pose proof len_succ mem_list (Datatypes.length rm_first_action_trace) H5.
+     destruct H as [in_list_first_mem [rm_first_mem_list ?]].
+(*以下代码展出action_trace的另一种表述形式，但上面已经表示好了
      pose proof cons_eq last_action rm_last_action_trace .
      destruct H10 as [first_action [rm_first_action_trace]].
      rewrite H10 in H9.
      simpl in H9.
+     
+     *)
+     
+     (* 非常好引理，使我的assert消失
      assert(exists (m:int256->int256)(rm_last_m:list (int256->int256) ),rm_last_m++[m]=mem_list).
 { 
      destruct mem_list.
@@ -425,12 +495,16 @@ Proof.
 }
      destruct H11 as [last_mem_in_list [rm_last_mem_list ?]].
      Print cons_eq.
-     pose proof cons_eq last_mem_in_list rm_last_mem_list.
-     destruct H12 as [first_mem_in_list [rm_first_mem_list ?]].
+     *)
+     pose proof cons_app_eq in_list_first_mem rm_first_mem_list.
+     destruct H9 as [in_list_last_mem [rm_last_mem_list ?]].
      subst.
-     clear H9.
-     pose proof H8;clear H8.
-     unfold In in H4.
+     simpl in H5.
+     inversion H5;clear H5.
+    (*-------------------------由此，mem_list消失，由两种方式表述----------------
+    1. in_list_first_mem :: rm_first_mem_list
+    2. rm_last_mem_list ++ [in_list_last_mem]*)
+    (*-----------由program不为空，则可以找到第一个(最后一个)inst------------*)
      assert (exists (inst0:ins)(rm_first_program:list ins),inst0::rm_first_program = program).
      {
         destruct program.
@@ -438,21 +512,38 @@ Proof.
         + exists i,program.
             tauto.
      }
-     destruct H8 as [inst0[rm_first_prgram ?]].
-     subst.
-     simpl in H4.
-     clear H3.
-       inversion H;clear H.
-                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H5.
-                inversion H5;clear H5.
-                simpl in H.
-                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H7.
-                inversion H7;clear H7.
-       rewrite H10 in H1.
-       rewrite H0 in H1.
-       rewrite H12 in H1.
-      unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H1.
-       simpl in H1.
+     destruct H as [inst0[rm_first_prgram ?]].
+     subst;clear H3.
+     (*----------------------program成功拆封------------------------------*)
+     (*现在就剩两个条件，一个是满足自反传递闭包，一个是满足时间戳可以用，需要推出倒数第二个在program里面，之前尝试化简时间戳不太成功，这次事实化简第一个条件*)
+     (*-==============化简自反传递闭包==============*)
+     inversion H13;clear H13.
+     rewrite H0 in H.  (*将CPU_state由++形式转化为::形式方便化简*)
+      unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H.
+      unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H.
+      simpl in H.
+      rename x into n.
+      (*可以肯定现在n不为0*)
+      assert (exists (n0:nat),n = S n0).
+      {
+        destruct n.
+        + simpl in H.
+            sets_unfold in H.
+            inversion H;clear H.
+            inversion H3.
+         + exists n.
+             tauto. 
+      }
+      destruct H3 as [n0 ?].
+      subst.
+      simpl in H;sets_unfold in H.
+      destruct H as [second_pc_state [first_act_state [remain_act_state ? ]]].
+      destruct H as [? [? ?]].
+      
+      
+      
+      
+      (*以下为处理时间戳的废弃代码*)
        rewrite H8 in H1.
        rewrite H5 in H1.
        unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H9.

@@ -22,7 +22,7 @@ Import pc_state.
 Import act_state.
 
 (* This is a template Lemma for you to test the environment, 
-  if you can complie this lemma correctly, 
+  if you can complie this lemma correctly,  
   then you can just delete this lemma and write your own code *)
 Lemma POP_sem_trivial: forall (pc: nat)(y: act_state)(x z: pc_state), 
   POP_sem pc x (cons y nil) z ->
@@ -185,6 +185,117 @@ Inductive multiset:list ins-> list CPU_state -> Prop:=
 C1::C2::rm_2_CPU_trace=CPU_trace -> C1.(inst)::rm_program = program -> multiset program CPU_trace
 .
 
+Lemma cons_before_nil:
+  forall [A:Type](x y:A)(l:list A),
+  [x] = y::l
+  -> y = x /\ l = [].
+Proof.
+  intros.
+  pose proof cons_app_eq y l.
+  destruct H0 as [? [? ?]].
+  rewrite H0 in H.
+  pose proof app_after_nil_1 x1 x0 x.
+  symmetry in H.
+  pose proof H1 H.
+  clear H1.
+  subst.
+  split.
+  + destruct l.
+    - inversion H0.
+       symmetry in H2.
+       inversion H.
+       subst.
+       simpl in H.
+       tauto.
+     - inversion H0.
+  + destruct l.
+      - tauto.
+      - inversion H0.
+Qed.
+
+
+Lemma one_step_generate_one_action:
+  forall (first_pc_state run_one_step_pc_state:pc_state)(act_trace:list act_state)(inst:ins)(remain_program:list ins),
+fold_right
+        (fun (x y : pc_state -> list act_state -> pc_state -> Prop)
+           (a : pc_state) (a0 : list act_state) 
+           (a1 : pc_state) => x a a0 a1 \/ y a a0 a1)
+        (fun (_ : pc_state) (_ : list act_state) (_ : pc_state) => False)
+        (map eval_ins
+           (combine (inst :: remain_program)
+              (seq 0
+                 (Datatypes.length (inst::remain_program)))))
+        first_pc_state act_trace run_one_step_pc_state
+        -> first_pc_state.(pc) = 0
+        -> act_trace <> [].
+Proof.
+  intros.
+  assert (remain_program = []).
+  {admit. }
+  subst.
+  simpl in H.
+  destruct H.
+  + destruct inst0;inversion H;discriminate.
+  + contradiction.
+(*
+  induction act_trace.
+  + simpl in H.
+     destruct H.
+     - destruct inst0;inversion H.
+     - 
+  inversion H;clear H;destruct first_pc_state;simpl in H0;rewrite H0 in H1.
+  +
+    unfold eval_ins in H1.
+    destruct inst0;inversion H1;discriminate.
+  +
+      Print fold_right.
+      unfold fold_right in H1.
+      apply rev_ind with (l:= remain_program).
+      - simpl in H1.
+        contradiction.
+      - simpl in H1.
+        destruct H1.
+        * destruct a; inversion H; simpl in H3;discriminate.
+        * 
+          destruct  IHremain_program.
+          ++ unfold seq in H.
+                simpl in H.
+                unfold eval_ins in H.
+                unfold map in H.
+                unfold fold_right in H.
+                simpl in H.
+      pose proof IHremain_program H1.
+    - inversion H1.
+  + 
+  destruct inst0.
+  +
+  inversion H;clear H. 
+    -  unfold eval_ins in H1.
+       inversion H1.
+       subst.
+        discriminate.
+    - destruct first_pc_state.
+       simpl in H0.
+       rewrite H0 in H1.
+       induction remain_program.
+       * simpl in H1. contradiction.
+       * simpl in H1. 
+
+*)
+ Admitted.
+      
+Lemma map_nil:
+  forall [A B:Type] (f:A->B) (l:list A),
+  [] = map f l
+  -> l = [].
+Proof.
+  intros.
+  destruct l.
+  + tauto.
+  + simpl in H.
+      discriminate.
+Qed.
+
 Theorem completeness_of_protocol:
 forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace:
 list CPU_state)
@@ -257,18 +368,20 @@ Proof.
       - apply public with (program:= program)(CPU_trace:= [last_CPU_state])(action_trace:=[])(memory_trace:=[]).
   + intros.
      subst.
-     pose proof cons_eq x l.
+     rename l into rm_last_two_CPU_trace.
+     rename x into last_two_2_CPU_state.
+     pose proof cons_eq last_two_2_CPU_state rm_last_two_CPU_trace.
      destruct H0 as [? [rm_first_last_CPU_trace ?]].
      rewrite H0 in H1.
      inversion H1;clear H1.
      symmetry in H7.
      subst.
-     rename x into rm_last_two_2_CPU_state.
-     specialize (H program (l ++ [rm_last_two_2_CPU_state]) rm_first_last_CPU_trace first_CPU_state rm_last_two_2_CPU_state).
-     pose proof last_length l  rm_last_two_2_CPU_state .
+    
+     specialize (H program (rm_last_two_CPU_trace ++ [last_two_2_CPU_state]) rm_first_last_CPU_trace first_CPU_state last_two_2_CPU_state).
+     pose proof last_length rm_last_two_CPU_trace  last_two_2_CPU_state .
      rewrite H1 in H2;clear H1.
      assert (exists (rm_last_action_trace:list action_type)(a:action_type), rm_last_action_trace++[a]=action_trace
-/\Datatypes.length l = Datatypes.length rm_last_action_trace).
+/\Datatypes.length rm_last_two_CPU_trace = Datatypes.length rm_last_action_trace).
 {
      destruct action_trace.
      simpl in H2.
@@ -285,22 +398,362 @@ Proof.
           rewrite H6 in H2;clear H6.
           lia.
 }
-     destruct H1 as[rm_last_action_trace [last_action_trace [? ?]]].
+     destruct H1 as[rm_last_action_trace [last_action [? ?]]];clear H2.
      specialize (H rm_last_action_trace).
-     pose proof H H0 (ltac:(tauto)).
-     pose proof H7 H6 H3.
-     clear H H7.
-     destruct H5 as  [mem_list [first_mem [last_mem [H9 H10]]]].
+     pose proof H H0 (ltac:(tauto)) H6 H3;     clear H. (*H2就是原本的归纳条件*)
+(*上面两行完成对归纳条件的初步化简*)
+     inversion H5;clear H5.
+     rename x into mem_list.
+     destruct H as  [first_mem [last_mem [H9 H10]]].
      inversion H10;clear H10.
      subst.
      inversion H11;clear H11.
-     inversion H12;clear H12.
-     unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H10.
-     unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H1.
-     pose proof cons_eq rm_last_two_2_CPU_state l .
-     pose proof cons_eq last_action_trace rm_last_action_trace.
-     destruct H11 as [first [last_two ?]].
-     destruct H12 as [firsxt_ [rm_first ?]].
+     (*在此之前先处理mem_list的长度问题*)
+     pose proof cons_eq last_action rm_last_action_trace .
+     destruct H10 as [first_action [rm_first_action_trace]].
+     rewrite H10 in H9.
+     simpl in H9.
+     assert(exists (m:int256->int256)(rm_last_m:list (int256->int256) ),rm_last_m++[m]=mem_list).
+{ 
+     destruct mem_list.
+     + inversion H9.
+     + pose proof cons_app_eq i mem_list.
+         destruct H11 as[m [rm_last ?]].
+         exists m,rm_last.
+         symmetry in H11.
+         tauto.
+}
+     destruct H11 as [last_mem_in_list [rm_last_mem_list ?]].
+     Print cons_eq.
+     pose proof cons_eq last_mem_in_list rm_last_mem_list.
+     destruct H12 as [first_mem_in_list [rm_first_mem_list ?]].
+     subst.
+     clear H9.
+     pose proof H8;clear H8.
+     unfold In in H4.
+     assert (exists (inst0:ins)(rm_first_program:list ins),inst0::rm_first_program = program).
+     {
+        destruct program.
+        + contradiction.
+        + exists i,program.
+            tauto.
+     }
+     destruct H8 as [inst0[rm_first_prgram ?]].
+     subst.
+     simpl in H4.
+     clear H3.
+       inversion H;clear H.
+                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H5.
+                inversion H5;clear H5.
+                simpl in H.
+                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H7.
+                inversion H7;clear H7.
+       rewrite H10 in H1.
+       rewrite H0 in H1.
+       rewrite H12 in H1.
+      unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H1.
+       simpl in H1.
+       rewrite H8 in H1.
+       rewrite H5 in H1.
+       unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H9.
+       rewrite H10 in H9.
+       rewrite H0 in H9.
+       rewrite H12 in H9.
+       simpl in H9.
+     inversion H9;clear H9. (*该步对时间戳分类讨论*)
+     - (*以下为时间戳只有一个，即只运行一步的情况*)
+        pose proof map_nil (fun x : CPU_state * (int256 -> int256) * action_type =>
+         {|
+           pc := (fst (fst x)).(pc);
+           state :=
+             {|
+               memory := snd (fst x);
+               program_state.stack := (fst (fst x)).(stack)
+             |};
+           action := snd x
+         |}) (combine (combine rm_first_last_CPU_trace rm_first_mem_list)
+           rm_first_action_trace).
+       pose proof H9 H11.
+       clear H9 H11.
+       rename x0 into first_pc_state.
+       (*
+      pose proof cons_before_nil x0 ({| pc := 0 ; state := {| memory := first_mem_in_list; program_state.stack := [] |}; action := first_action |}) (map (fun x : CPU_state * (int256 -> int256) * action_type => {| pc := (fst (fst x)).(pc); state := {| memory := snd (fst x); program_state.stack := (fst (fst x)).(stack) |}; action := snd x |})
+          (combine (combine rm_first_last_CPU_trace rm_first_mem_list) rm_first_action_trace)).
+       pose proof H9 H8;clear H8 H9.*)
+       simpl in H7.
+       
+       destruct H13.
+       pose proof H1;clear H1.
+       rename x into n.
+       inversion H;clear H.
+       rewrite H14 in H8.
+       rewrite H5 in H8.
+       subst.
+      pose proof H6.
+      pose proof H0.
+      pose proof H12.
+      pose proof H10.
+      clear H6 H0 H12 H10.
+      rewrite H1 in H13.
+            rewrite H7 in H13.
+                  rewrite H8 in H13.
+          unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H13.
+                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H13.
+        rewrite H14 in H13.
+                rewrite H5 in H13.
+        simpl in H13.
+        rewrite H9 in H13.
+        assert (n=1).
+        {
+            destruct n.
+            + simpl in H13;sets_unfold in H13;inversion H13;inversion H0.
+            + destruct n.
+                - tauto.
+                - simpl in H13;sets_unfold in H13;pose proof H13;clear H13.
+                  simpl in H0.
+                  destruct H0 as [unknow_pc_state [act_trace_1 [act_trace_2 ?] ]].
+                  destruct H0 as [? [? [? [? [? [? [? ?]]]] ]]]. 
+                  rename unknow_pc_state into run_one_step_pc_state.
+                  rename x into run_two_step_pc_state.
+                  inversion H6;clear H6.
+                  subst.
+                  unfold fold_ins_sem in H15.
+                  sets_unfold in H15.
+                  assert (exists (inst0 inst1:ins)(remain_program:list ins) ,inst0::inst1::remain_program = program).
+                  {
+                    destruct program.
+                    + contradiction.
+                    + destruct program.
+                       - inversion H12;clear H12;subst.
+                         unfold fold_ins_sem in H6.
+                         sets_unfold in H6.
+                         destruct i.
+                         * (*jimpi*)
+                         inversion H15;clear H15.
+                         unfold eval_ins in H10.
+                         inversion H10;clear H10.
+                         inversion H6;clear H6.
+                         unfold eval_ins in H10.
+                         inversion H10.
+                         subst.
+                         simpl in *.
+                         inversion H18.
+                          ++ simpl in *. contradiction.
+                          ++ simpl in *. contradiction.
+                          * (*jump*)
+                                                   inversion H15;clear H15.
+                         unfold eval_ins in H10.
+                         inversion H10;clear H10.
+                         inversion H6;clear H6.
+                         unfold eval_ins in H10.
+                         inversion H10.
+                         subst.
+                         simpl in *.
+                         inversion H18.
+                          ++ simpl in *. contradiction.
+                          ++ simpl in *. contradiction.
+                          * (*pop*)
+                                                   inversion H15;clear H15.
+                         unfold eval_ins in H10.
+                         inversion H10;clear H10.
+                         inversion H6;clear H6.
+                         unfold eval_ins in H10.
+                         inversion H10.
+                         subst.
+                         simpl in *.
+                         inversion H18.
+                          ++ simpl in *. inversion H19.
+                          ++ simpl in *. inversion H19.
+                          ++ simpl in *. contradiction.
+                          * (*add*)
+                                                   inversion H15;clear H15.
+                         unfold eval_ins in H10.
+                         inversion H10;clear H10.
+                         inversion H6;clear H6.
+                         unfold eval_ins in H10.
+                         inversion H10.
+                         subst.
+                         simpl in *.
+                         inversion H18.
+                          ++ simpl in *. inversion H19.
+                          ++ simpl in *. inversion H19.
+                          ++ simpl in *. contradiction.
+                          * (*mul*)
+                                                   inversion H15;clear H15.
+                         unfold eval_ins in H10.
+                         inversion H10;clear H10.
+                         inversion H6;clear H6.
+                         unfold eval_ins in H10.
+                         inversion H10.
+                         subst.
+                         simpl in *.
+                         inversion H18.
+                          ++ simpl in *. inversion H19.
+                          ++ simpl in *. inversion H19.
+                          ++ simpl in *. contradiction.
+                          * (*sub*)
+                                                   inversion H15;clear H15.
+                         unfold eval_ins in H10.
+                         inversion H10;clear H10.
+                         inversion H6;clear H6.
+                         unfold eval_ins in H10.
+                         inversion H10.
+                         subst.
+                         simpl in *.
+                         inversion H18.
+                          ++ simpl in *. inversion H19.
+                          ++ simpl in *. inversion H19.
+                          ++ simpl in *. contradiction.
+                          * (*mload*)
+                                                   inversion H15;clear H15.
+                         unfold eval_ins in H10.
+                         inversion H10;clear H10.
+                         inversion H6;clear H6.
+                         unfold eval_ins in H10.
+                         inversion H10.
+                         subst.
+                         simpl in *.
+                         inversion H18.
+                          ++ simpl in *. contradiction.
+                          ++ simpl in *. contradiction.
+                          * (*mstore*)
+                                                   inversion H15;clear H15.
+                         unfold eval_ins in H10.
+                         inversion H10;clear H10.
+                         inversion H6;clear H6.
+                         unfold eval_ins in H10.
+                         inversion H10.
+                         subst.
+                         simpl in *.
+                         inversion H18.
+                          ++ simpl in *. contradiction.
+                          ++ simpl in *. contradiction.
+                          * (*push*)
+                                                   inversion H15;clear H15.
+                         unfold eval_ins in H10.
+                         inversion H10;clear H10.
+                         inversion H6;clear H6.
+                         unfold eval_ins in H10.
+                         inversion H10.
+                         subst.
+                         inversion H10.
+                         simpl in *.
+                          ++ simpl in *. subst. inversion H0.
+                          ++ simpl in *. contradiction.
+                          ++ simpl in *. contradiction.
+                      - exists i,i0,program.
+                        tauto.
+                  }
+                  destruct H6 as [inst0 [inst1 [remain_program]]].
+                  subst.
+                  inversion H12;clear H12;subst.
+                  unfold fold_ins_sem in H6;sets_unfold in H6.
+                  assert (exists (a:act_state), act_trace_1 = [a]).
+                  {
+                    
+                  }
+        }
+        assert (In (last_two_2_CPU_state.(inst), last_two_2_CPU_state.(pc))
+       (combine program (seq 0 (Datatypes.length program)))).
+       {
+        + destruct last_two_2_CPU_state.
+       }
+       destruct n.
+       * inversion H13;clear H13.
+          sets_unfold in H1.
+          simpl in H14,H1.
+          unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H1.
+          rewrite H10 in H1.
+          rewrite H0 in H1.
+          rewrite H12 in H1.
+          inversion H1.
+       * (*当n不等于0的情况，其实就是要找n=1的情况，所以还要对S n的n归纳*)
+          destruct n.
+          ++ inversion H13;clear H13.
+                simpl in H1.
+                sets_unfold in H1.
+                destruct H1 as [act_1 [act_2 [H1 [? [? ?]]]]].
+                subst.
+                inversion H13;clear H13;subst.
+                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H8.
+                unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H1.
+                rewrite H10 in H1.
+                rewrite H0 in H1.
+                rewrite H12 in H1.
+                simpl in H1.
+                assert (exists (a:act_state)(rm_a_action:list act_state), a::rm_a_action=act_1).
+                {
+                   destruct act_1.
+                  +inversion H1.
+                  + exists a,act_1.
+                      tauto.
+                }
+                destruct H13 as [first_act [rm_first_act ?] ].
+                subst.
+                inversion H1;clear H1.
+                destruct first_action.
+                simpl in H11.
+
+                unfold fold_ins_sem in H8.
+                sets_unfold in H8.
+                inversion H;clear H.
+                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H5.
+                inversion H5;clear H5.
+                simpl in H.
+                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H7.
+                inversion H7;clear H7.
+                subst.
+                rewrite H6 in H8.
+                rewrite H5 in H8.
+                assert (rm_first_act = []).
+                {
+                  destruct rm_first_act.
+                  + tauto.
+                  + Print fold_right.
+                      destruct program.
+                      - contradiction.
+                      - simpl in H8.
+                        destruct H8.
+                        * destruct i;inversion H.
+                        * destruct program.
+                          ++ simpl in H. contradiction.
+                          ++ simpl in H.
+                                destruct H.
+                                -- destruct i0;inversion H.
+                                -- inversion H4.
+                                    ** inversion H0.
+                                        subst.
+                                        rewrite <- H10 in H.
+                                        destruct program.
+                                        +++ simpl in H;contradiction.
+                                        +++ simpl in H.
+                                                 destruct H.
+                                                 --- destruct i;inversion H.
+                                                 ---
+                }   
+                subst.
+                simpl in H8.
+                assert(rm_first_last_CPU_trace = [] /\ rm_first_mem_list = [] /\ rm_first_action_trace).
+                destruct mem_ins0.
+                -- exists [({| timestamp := timestamp0; mem_ins := read address value |})].
+                
+                   inversion H8.
+                destruct program. (*对program归纳，找到运行的第一步*)
+                -- contradiction.
+                -- inversion H8.
+                   ** destruct i.
+                       +++ inversion H13.
+                
+
+       
+       
+       
+       
+       unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H1.
+       pose proof cons_eq rm_last_two_2_CPU_state l .
+       pose proof cons_eq last_action_trace rm_last_action_trace.
+      destruct H11 as [first [last_two ?]].
+       destruct H12 as [firsxt_ [rm_first ?]].
      - destruct mem_list.
        * inversion H9. 
           rewrite H12 in H14.

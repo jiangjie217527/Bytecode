@@ -21,23 +21,6 @@ Import CPU_state.
 Import pc_state.
 Import act_state.
 
-(* This is a template Lemma for you to test the environment, 
-  if you can complie this lemma correctly,  
-  then you can just delete this lemma and write your own code *)
-Lemma POP_sem_trivial: forall (pc: nat)(y: act_state)(x z: pc_state), 
-  POP_sem pc x (cons y nil) z ->
-  (exists v: int256, x.(state) = y.(state) /\ y.(action).(mem_ins) = non /\
-  x.(pc) = pc /\ y.(pc) = pc /\ z.(pc) = pc + 1 /\
-  x.(state).(stack) = cons v z.(state).(stack) /\
-  y.(state).(memory) = z.(state).(memory)).
-Proof.
-  intros.
-  inversion H.
-  exists v.
-  subst.
-  repeat split; try tauto.
-Qed.
-
 Lemma app_after_nil_1: forall {A: Type}(l : list A) (x y:A),(l ++ [x]) = [y] -> l = [] .
 Proof.
   intros.
@@ -143,16 +126,6 @@ Proof.
       rewrite H3.
       tauto.
 Qed.
-
-Print Permutation.
-
-Definition f :=
-  fix f (l : list action_type):list action_type:=
-  match l with
-  | [] => []
-  | x::l0 => f l0
-  end.
-Print f.
 
 Inductive increase_mem_trace:list action_type-> Prop:=
 | nil_increase: increase_mem_trace nil
@@ -296,28 +269,70 @@ Proof.
       discriminate.
 Qed.
 
+
+(*不一定成立，可能f不是单射，导致可能l的第一个元素并不是x.*)
+(*所以在证明中需要证明eval_ins中(ins*pc)可以由第一个pc_state唯一确定*)
+(*唯一确定的理由可能是eval_ins由一个pc_state可以得到确定的ins*nat *)
+Lemma out_property:
+  forall (A B C D: Type) (x: A) (l: list A) (f: A -> B -> C -> D -> Prop)  (s1: B)(s2: C)(s3: D),
+  (forall (x y:A) (s11:B) (s21 s22:C) (s31 s32:D), f x s11 s21 s31 /\ f y s11 s22 s32 -> x = y ) -> f x s1 s2 s3 -> fold_right Sets.union ∅ (map f l) s1 s2 s3 -> In x l \/ False.
+Proof.
+  intros.
+  left.
+  induction l as [| y l' IHl'].
+  + simpl in H1.
+     inversion H1.
+  + simpl.
+     inversion H1. 
+     - left.
+      specialize (H x y s1 s2 s2 s3 s3).
+      destruct H.
+      * split;tauto.
+      * tauto.
+     - pose proof IHl' H2.
+      right.
+      tauto.
+Qed.
+
+Theorem eval_ins_mono:
+  forall (x y:(ins*nat)) (s11:pc_state) (s21 s22:list act_state) (s31 s32:pc_state), eval_ins x s11 s21 s31 /\ eval_ins y s11 s22 s32 -> x = y.
+Proof.
+  intros.
+  destruct H.
+  unfold eval_ins in H.
+  unfold eval_ins in H0.
+  destruct s11.
+  destruct x.
+  destruct y.
+  destruct i.
+  + inversion H;clear H;     subst.
+     destruct i0;inversion H0;clear H0;subst;simpl in *.
+     - tauto.
+     -  
+Admitted.
+
 Theorem completeness_of_protocol:
 forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace:
 list CPU_state)
-(first_CPU_state last_CPU_state: CPU_state)
-(action_trace: list action_type),
-CPU_trace = cons first_CPU_state rm_first_CPU_trace ->
-CPU_trace = rm_last_CPU_trace ++ [last_CPU_state] ->
-length rm_last_CPU_trace = length action_trace -> (* 新增条件 *)
-program <> [] -> (* 新增条件 *)
-In (last_CPU_state.(inst), last_CPU_state.(pc)) (combine program (seq 0
-(length program))) -> (* 新增条件 *)
-(exists (mem_list: list (int256 -> int256))(first_mem last_mem: int256 ->
-int256),
-length mem_list = length action_trace /\
-eval_ins_list program
-(combine_to_pc_state first_CPU_state first_mem)
-(combine_to_act_state_list rm_last_CPU_trace mem_list action_trace) (* 注
-意这里 combine_to_act_state_list 是用 combine 实现的，不要求 rm_last_CPU_trace
-和 mem_list 以及 action_trace 长度相等 *)
-(combine_to_pc_state last_CPU_state last_mem))
--> exists (memory_trace: list action_type), constraints program CPU_trace
-action_trace memory_trace. (* 需要用条件和归纳假设自行构造 memory_trace *)
+  (first_CPU_state last_CPU_state: CPU_state)
+  (action_trace: list action_type),
+  CPU_trace = cons first_CPU_state rm_first_CPU_trace ->
+  CPU_trace = rm_last_CPU_trace ++ [last_CPU_state] ->
+  length rm_last_CPU_trace = length action_trace -> (* 新增条件 *)
+  program <> [] -> (* 新增条件 *)
+  In (last_CPU_state.(inst), last_CPU_state.(pc)) (combine program (seq 0
+  (length program))) -> (* 新增条件 *)
+  (exists (mem_list: list (int256 -> int256))(first_mem last_mem: int256 ->
+  int256),
+  length mem_list = length action_trace /\
+  eval_ins_list program
+  (combine_to_pc_state first_CPU_state first_mem)
+  (combine_to_act_state_list rm_last_CPU_trace mem_list action_trace) (* 注
+  意这里 combine_to_act_state_list 是用 combine 实现的，不要求 rm_last_CPU_trace
+  和 mem_list 以及 action_trace 长度相等 *)
+  (combine_to_pc_state last_CPU_state last_mem))
+  -> exists (memory_trace: list action_type), constraints program CPU_trace
+  action_trace memory_trace. (* 需要用条件和归纳假设自行构造 memory_trace *)
 Proof.
   intros program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace.
   revert program CPU_trace rm_first_CPU_trace first_CPU_state last_CPU_state action_trace.
@@ -522,8 +537,8 @@ Proof.
       unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H.
       unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H.
       simpl in H.
+      (*--------------可以肯定现在n不为0---------------------*)
       rename x into n.
-      (*可以肯定现在n不为0*)
       assert (exists (n0:nat),n = S n0).
       {
         destruct n.
@@ -536,13 +551,50 @@ Proof.
       }
       destruct H3 as [n0 ?].
       subst.
+      (*----------------完成对n的归纳,此时可以继续化简------------------*)
       simpl in H;sets_unfold in H.
       destruct H as [second_pc_state [first_act_state [remain_act_state ? ]]].
       destruct H as [? [? ?]].
+      (*----------化简得到3个条件-----------
+      1. 已知了action_trace的第一个
+      2. 已知第一步的单步
+      3. 已知第二步可以走到最后一步
+      接下来证明思路的问题是：已知的都是前几步，如何证明倒数第二步能到最后一步*)
+      (*或者说，接下来需要思考，
+      什么条件能证明出来某一个CPU_state的inst和pc In program*)
+      (*给条件的是最后一个不方便证明，前面按道理都可以证明，所以有没有可能*)
+      (*是归纳地证明，第一个可以，然后前一个可以则后一个可以*)
+      (*-------------对这第一步的单步化简---------------*)
+      inversion H3;clear H3;subst.
+      rewrite H14 in H13.
+      rewrite H10 in H13.
+      simpl in H13.
+      
+            inversion H13;clear H13.
+            - admit.
+           - sets_unfold in H3.
+      
+      (*要想使用H13，就需要证明eval_ins是单射（见Out_property）*)
+      (*要证明单射，就要用到时间戳，所以下面是处理时间戳来证明单射的代码*)
+      (*------------------------证明单射(由于太长已经移到Lemma里面了)-----------------------------*)
+      
+Admitted.
+(*
+      inversion H13;clear H13.
+      - admit.
+      - sets_unfold in H3.
+        Search (map ?f ?l).
+        Search (fold_right ?f ?a ?l ?s1 ?s2 ?s4).
+        Check eval_ins.
       
       
-      
-      
+      assert(In (first_CPU_state.(inst),first_CPU_state.(pc)) (combine (inst0 :: rm_first_prgram)
+   (seq 0 (Datatypes.length (inst0 :: rm_first_prgram))))).
+   {
+      rewrite H14.
+      simpl.
+      left.
+     } 
       (*以下为处理时间戳的废弃代码*)
        rewrite H8 in H1.
        rewrite H5 in H1.
@@ -1216,15 +1268,14 @@ H2 : last_CPU_state = first_CPU_state
 }.
 Admitted.
 
-(*      induction n.
+     induction n.
       * simpl in H6.
         destruct H6.
         inversion H6.
         rewrite H8 in H5.
         rewrite Heqx in H7.
         rewrite Heqz in H7.
-        inversion H7.*)
-(*
+        inversion H7.
       rewrite H.
       induction rm_first_CPU_trace.
       * simpl.

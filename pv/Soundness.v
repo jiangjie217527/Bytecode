@@ -315,7 +315,7 @@ Proof.
             [last_CPU_state'] [last_mem'] [x]) (combine_to_pc_state last_CPU_state
             last_mem)).
             {
-              inversion H31. clear H26 H27 x0 y.
+              inversion H31. clear H26 H27 x0.
               inversion H25. clear H27 H25 offset value0.
               assert (last_mem' address = value).
               {

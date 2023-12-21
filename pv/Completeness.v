@@ -271,11 +271,17 @@ Qed.
 
 
 (*不一定成立，可能f不是单射，导致可能l的第一个元素并不是x.*)
-(*所以在证明中需要证明eval_ins中(ins*pc)可以由第一个pc_state唯一确定*)
-(*唯一确定的理由可能是eval_ins由一个pc_state可以得到确定的ins*nat *)
+(*所以在证明中需要证明eval_ins中(ins*pc)可以由后面三个参数唯一确定*)
+(*为什么不是只有第一个就可以确定。按道理某个pc_state固定了，后面的也确定了
+因为pc_state 包含了pc,memory stack，但是我们并不知道这个inst它和pc的关系
+举个例子，如果f x s1 s2 s3中x为(add 0) f y s1 t2 t3 中y为(sub 0)，那么其实s1看上去也是
+一样的（ins貌似并不存储在memory和stack里面而是在program里面）
+但是这两个的结果是s3,t3不同
+同理，如果一个读一个写，那就是s2,t2不同*)
+(*唯一确定的理由可能是eval_ins由后面三个参数可以得到确定的ins*nat *)
 Lemma out_property:
   forall (A B C D: Type) (x: A) (l: list A) (f: A -> B -> C -> D -> Prop)  (s1: B)(s2: C)(s3: D),
-  (forall (x y:A) (s11:B) (s21 s22:C) (s31 s32:D), f x s11 s21 s31 /\ f y s11 s22 s32 -> x = y ) -> f x s1 s2 s3 -> fold_right Sets.union ∅ (map f l) s1 s2 s3 -> In x l \/ False.
+  (forall (x y:A) (s1:B) (s2:C) (s3:D), f x s1 s2 s3 /\ f y s1 s2 s3 -> x = y ) -> f x s1 s2 s3 -> fold_right Sets.union ∅ (map f l) s1 s2 s3 -> In x l \/ False.
 Proof.
   intros.
   left.
@@ -285,7 +291,7 @@ Proof.
   + simpl.
      inversion H1. 
      - left.
-      specialize (H x y s1 s2 s2 s3 s3).
+      specialize (H x y s1 s2 s3).
       destruct H.
       * split;tauto.
       * tauto.
@@ -295,7 +301,7 @@ Proof.
 Qed.
 
 Theorem eval_ins_mono:
-  forall (x y:(ins*nat)) (s11:pc_state) (s21 s22:list act_state) (s31 s32:pc_state), eval_ins x s11 s21 s31 /\ eval_ins y s11 s22 s32 -> x = y.
+  forall (x y:(ins*nat)) (s1:pc_state) (s2:list act_state) (s3:pc_state), eval_ins x s1 s2 s3 /\ eval_ins y s1 s2 s3 -> x = y.
 Proof.
   intros.
   destruct H.

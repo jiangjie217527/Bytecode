@@ -4591,7 +4591,7 @@ Lemma in_property : forall (A B C D: Type) (x: A) (l: list A) (f: A -> B -> C ->
   In x l -> f x s1 s2 s3 -> fold_right Sets.union ∅ (map f l) s1 s2 s3.
 Proof.
   intros A B C D x l f s1 s2 s3 Hin Hfx.
-  
+  Print fold_right.
   (* 使用 fold_right 的性质对列表 l 进行归纳 *)
   induction l as [| y l' IHl'].
   - (* Case: l is empty *)

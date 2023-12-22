@@ -9,6 +9,7 @@ Require Import compcert.lib.Integers.
 Require Import Coq.micromega.Lia.
 Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Definition_and_soundness.  Import Definition_and_soundness.
+Require Import Lemma. Import Lemma.
 
 Local Open Scope string.
 Local Open Scope sets.
@@ -21,439 +22,6 @@ Import CPU_state.
 Import pc_state.
 Import act_state.
 
-Lemma app_after_nil_1: forall {A: Type}(l : list A) (x y:A),(l ++ [x]) = [y] -> l = [] .
-Proof.
-  intros.
-   Search length (?l ++ ?[x]).
-     pose proof app_length.
-      specialize (H0 A l [x]).
-      rewrite H in H0.
-      simpl in H0.
-      assert (length l = 0).
-    {
-        lia.
-}
-      Search (length ?l = 0).
-      pose proof length_zero_iff_nil.
-      specialize(H2 A l).
-      destruct H2.
-      clear H3.
-      tauto.
-Qed.
-
-Lemma app_after_nil_2:forall {A: Type}(l : list A) (x y:A),(l ++ [x]) = [y] -> x=y.
-Proof.
-  intros.
-  pose proof app_after_nil_1 l x y H.
-  rewrite H0 in H.
-  simpl in H.
-  inversion H.
-  tauto.
-Qed.
-
-Lemma app_last_corr:
-  forall [A : Type] (l l' : list A) (y y' : A),
-  l ++ [y] = l' ++ [y'] -> l = l' /\ y = y'.
-Proof.
-  intros.
-  inversion H.
-  split.
-    + apply app_inj_tail in H. tauto.
-    + apply app_inj_tail in H. tauto.
-Qed.
-
-Lemma cons_eq: forall {A : Type} (x : A) (l : list A), exists y l',  l ++ [x] = y:: l'.
-Proof.
-  intros.
-  revert x.
-  induction l. intros.
-  - exists x, []. reflexivity.
-  - intros. exists a, (l++[x]). reflexivity.
-Qed.
-
-Lemma filter_cons_app_single:
-  forall [A: Type] (P : A -> bool) (l: list A) (x:A),
-  filter P (l++[x]) = (filter P l) ++ (filter P [x]).
-Proof.
-  Print filter.
-  induction l.
-  + simpl.
-   tauto.
-  + simpl.
-   intros.
-   assert(a :: filter P (l ++ [x]) = a :: filter P l ++ (if P x then [x] else [])).
-   { 
-    specialize (IHl x).
-    rewrite IHl.
-    simpl.
-    tauto.
-  }
-    assert(filter P (l ++ [x]) =filter P l ++ (if P x then [x] else [])).
-   { 
-    specialize (IHl x).
-    rewrite IHl.
-    simpl.
-    tauto.
-  }
-  rewrite H.
-  rewrite H0.
-  destruct (P a).
-  - tauto.
-  - tauto.
-Qed.
-
-Lemma filter_cons_app:
-  forall [A: Type] (P : A -> bool) (l l': list A) ,
-  filter P (l++l') = (filter P l) ++ (filter P l').
-Proof.
-  intros.
-  apply rev_ind with (l:= l').
-  + simpl. 
-     pose proof app_nil_r l.
-     pose proof app_nil_r (filter P l).
-     rewrite H.
-     rewrite H0.
-     tauto.
-  + intros.
-      pose proof  filter_cons_app_single P l0 x.
-      rewrite H0.
-      pose proof app_assoc (filter P l) (filter P l0)(filter P [x]).
-      rewrite H1.
-      rewrite <- H.
-      pose proof app_assoc (l) (l0)([x]).
-      rewrite H2.
-      pose proof filter_cons_app_single P (l ++ l0) x.
-      rewrite H3.
-      tauto.
-Qed.
-
-Inductive increase_mem_trace:list action_type-> Prop:=
-| nil_increase: increase_mem_trace nil
-| single_increase: forall (m:list action_type), length m = 1 -> increase_mem_trace m
-| multi_increase_read_to_read: forall (m:list action_type) (m0 m1: action_type) (m': list action_type)
-( add0  add1  val0  val1:int256),
-  m0::(m1::m') = m -> m0.(mem_ins) = read add0  val0 -> m1.(mem_ins) = read  add1 val1
-  -> (Int256.unsigned add0 <= Int256.unsigned add1)%Z -> ((Int256.unsigned add0 = Int256.unsigned add1)%Z -> m0.(timestamp) < m1.(timestamp))
-  -> increase_mem_trace m
-| multi_increase_read_to_write: forall (m:list action_type) (m0 m1: action_type) (m': list action_type)
-( add0  add1  val0  val1:int256),
-  m0::(m1::m') = m -> m0.(mem_ins) = write add0  val0 -> m1.(mem_ins) = read  add1 val1
-  -> (Int256.unsigned add0 <= Int256.unsigned add1)%Z -> ((Int256.unsigned add0 = Int256.unsigned add1)%Z-> m0.(timestamp) < m1.(timestamp))
-  -> increase_mem_trace m
-| multi_increase_write_to_read: forall (m:list action_type) (m0 m1: action_type) (m': list action_type)
-( add0  add1  val0  val1:int256),
-  m0::(m1::m') = m -> m0.(mem_ins) = read add0  val0 -> m1.(mem_ins) = write add1 val1
-  -> (Int256.unsigned add0 <= Int256.unsigned add1)%Z -> ((Int256.unsigned add0 = Int256.unsigned add1)%Z -> m0.(timestamp) < m1.(timestamp))
-  -> increase_mem_trace m
-| multi_increase_write_to_write: forall (m:list action_type) (m0 m1: action_type) (m': list action_type)
-( add0  add1  val0  val1:int256),
-  m0::(m1::m') = m -> m0.(mem_ins) = write add0  val0 -> m1.(mem_ins) = write  add1 val1
-  -> (Int256.unsigned add0 <= Int256.unsigned add1)%Z -> ((Int256.unsigned add0 = Int256.unsigned add1)%Z -> m0.(timestamp) < m1.(timestamp))
-  -> increase_mem_trace m
-.
-
-Inductive multiset:list ins-> list CPU_state -> Prop:=
-| halt: forall (CPU_trace:list CPU_state) (program:list ins), length CPU_trace = 1 -> program = []->multiset program CPU_trace
-| run: forall (CPU_trace rm_2_CPU_trace:list CPU_state) (program rm_program:list ins) (C1 C2:CPU_state), 
-C1::C2::rm_2_CPU_trace=CPU_trace -> C1.(inst)::rm_program = program -> multiset program CPU_trace
-.
-
-Lemma cons_before_nil:
-  forall [A:Type](x y:A)(l:list A),
-  [x] = y::l
-  -> y = x /\ l = [].
-Proof.
-  intros.
-  pose proof cons_app_eq y l.
-  destruct H0 as [? [? ?]].
-  rewrite H0 in H.
-  pose proof app_after_nil_1 x1 x0 x.
-  symmetry in H.
-  pose proof H1 H.
-  clear H1.
-  subst.
-  split.
-  + destruct l.
-    - inversion H0.
-       symmetry in H2.
-       inversion H.
-       subst.
-       simpl in H.
-       tauto.
-     - inversion H0.
-  + destruct l.
-      - tauto.
-      - inversion H0.
-Qed.
-
-
-Lemma one_step_generate_one_action:
-  forall (first_pc_state run_one_step_pc_state:pc_state)(act_trace:list act_state)(inst:ins)(remain_program:list ins),
-fold_right
-        (fun (x y : pc_state -> list act_state -> pc_state -> Prop)
-           (a : pc_state) (a0 : list act_state) 
-           (a1 : pc_state) => x a a0 a1 \/ y a a0 a1)
-        (fun (_ : pc_state) (_ : list act_state) (_ : pc_state) => False)
-        (map eval_ins
-           (combine (inst :: remain_program)
-              (seq 0
-                 (Datatypes.length (inst::remain_program)))))
-        first_pc_state act_trace run_one_step_pc_state
-        -> first_pc_state.(pc) = 0
-        -> act_trace <> [].
-Proof.
-  intros.
-  assert (remain_program = []).
-  (*
-  subst.
-  simpl in H.
-  destruct H.
-  + destruct inst0;inversion H;discriminate.
-  + contradiction.*)
-(*
-  induction act_trace.
-  + simpl in H.
-     destruct H.
-     - destruct inst0;inversion H.
-     - 
-  inversion H;clear H;destruct first_pc_state;simpl in H0;rewrite H0 in H1.
-  +
-    unfold eval_ins in H1.
-    destruct inst0;inversion H1;discriminate.
-  +
-      Print fold_right.
-      unfold fold_right in H1.
-      apply rev_ind with (l:= remain_program).
-      - simpl in H1.
-        contradiction.
-      - simpl in H1.
-        destruct H1.
-        * destruct a; inversion H; simpl in H3;discriminate.
-        * 
-          destruct  IHremain_program.
-          ++ unfold seq in H.
-                simpl in H.
-                unfold eval_ins in H.
-                unfold map in H.
-                unfold fold_right in H.
-                simpl in H.
-      pose proof IHremain_program H1.
-    - inversion H1.
-  + 
-  destruct inst0.
-  +
-  inversion H;clear H. 
-    -  unfold eval_ins in H1.
-       inversion H1.
-       subst.
-        discriminate.
-    - destruct first_pc_state.
-       simpl in H0.
-       rewrite H0 in H1.
-       induction remain_program.
-       * simpl in H1. contradiction.
-       * simpl in H1. 
-
-*)
-Abort.
-      
-Lemma map_nil:
-  forall [A B:Type] (f:A->B) (l:list A),
-  [] = map f l
-  -> l = [].
-Proof.
-  intros.
-  destruct l.
-  + tauto.
-  + simpl in H.
-      discriminate.
-      Check Datatypes.length.
-Qed.
-
-
-(*不一定成立，可能f不是单射，导致可能l的第一个元素并不是x.*)
-(*所以在证明中需要证明eval_ins中(ins*pc)可以由后面三个参数唯一确定*)
-(*为什么不是只有第一个就可以确定。按道理某个pc_state固定了，后面的也确定了
-因为pc_state 包含了pc,memory stack，但是我们并不知道这个inst它和pc的关系
-举个例子，如果f x s1 s2 s3中x为(add 0) f y s1 t2 t3 中y为(sub 0)，那么其实s1看上去也是
-一样的（ins貌似并不存储在memory和stack里面而是在program里面）
-但是这两个的结果是s3,t3不同
-同理，如果一个读一个写，那就是s2,t2不同*)
-(*唯一确定的理由可能是eval_ins由后面三个参数可以得到确定的ins*nat *)
-(*但是单射这个条件太强了，其实pop 和jump就不是单射，可以inst不一样但是行为完全一样*)
-(*所以只能确定nat,所以这个定理确实不一定成立*)
-(*--------------x可能不在l里，但是x2一定在l的第二个里面 ---------------*)
-
-Lemma out_property:
-  forall [A B C D:Type] (x:A*nat) (l: list (A*nat)) (f: (A*nat) -> B -> C -> D -> Prop)  (s1: B)(s2: C)(s3: D) (x1:A)(x2:nat)(l1:list A)(l2:list nat),
-  (forall (x y:A*nat) (s1:B) (s2:C) (s3:D) (x1 x2:A)(y1 y2:nat), x = (x1,y1)-> y=(x2,y2)-> f x s1 s2 s3 /\ f y s1 s2 s3 -> y1 = y2 ) -> fold_right Sets.union ∅ (map f l) s1 s2 s3 -> f x s1 s2 s3 -> x = (x1,x2) -> l = (combine l1 l2) ->length l1 = length l2->In x2 l2.
-Proof.
-  intros A B C D x l f s1 s2 s3 x1 x2 l1 l2.
-  revert x  f s1 s2 s3 x1 x2 l1 l2.
-  induction l.
-  + intros.
-       destruct l2.
-     - contradiction.
-     - simpl in H4.
-       symmetry in H4.
-       pose proof len_succ l1 (Datatypes.length l2) H4.
-       destruct H5 as [? [? ?]].
-       rewrite H5 in H3.
-       inversion H3.
-  + intros.
-    assert (exists (ins0:A) (l':list A),l1 = ins0::l').
-    {
-      destruct l1.
-      inversion H3.
-      exists a0,l1.
-      tauto.
-    }
-    destruct H5 as [ins0 [l12 ?]].
-    subst.
-     destruct l2.
-     - inversion H4.
-      (*
-       pose proof length_zero_iff_nil l1.
-       destruct H6;clear H8.
-       pose proof H6 H7.
-       contradiction.*)
-     - inversion H0;clear H0.
-       * destruct a;subst.
-         specialize (H (x1,x2) (a,n0) s1 s2 s3 x1 a x2 n0).
-         pose proof H (ltac:(tauto)) (ltac:(tauto));clear H.
-         destruct H0.
-         split;tauto.
-         inversion H3.
-         unfold In.
-         left.
-         tauto.
-       * inversion H3;clear H3. 
-       inversion H4;clear H4.
-         specialize (IHl (x1,x2) f s1 s2 s3 x1 x2 l12 l2).
-         pose proof IHl H H2 H1 (ltac:(tauto)) H6 H3;clear IHl. (*(ltac:(tauto)) (ltac:(tauto));clear H*)
-         unfold In.
-         right.
-         tauto.
-Qed.
-
-Lemma stack_difference_2:
-  forall [A:Type] (l l':list A)(a:A),
-  l = l' -> l = a::l' -> False.
-Proof.
-  intros.
-  rewrite H in H0.
-  assert (length (a :: l') <>length l' ).
-   {
-    simpl.
-    pose proof Nat.neq_succ_diag_l (Datatypes.length l').
-    tauto.
-   }
-   rewrite <- H0 in H1.
-   contradiction.
-Qed.
-Lemma stack_difference:
-  forall [A:Type] (l l':list A)(a b c:A),
-  l = a:: l' -> l = b :: c :: l'->False.
-Proof.
-  intros.
-  rewrite H in H0.
-   inversion H0.
-   pose proof stack_difference_2 l' l' c (ltac:(tauto)) H3.
-   tauto.
-Qed.
-
-Lemma  stack_difference_3:
-  forall  [A:Type] (l l':list A),
-  l' <> [] -> l = l' ++ l -> False.
-Proof.
-  intros.
-  assert (length l = length (l' ++ l)).
-  {
-    rewrite <- H0.
-    tauto.
-  }
-  pose proof app_length l' l.
-  rewrite H2 in H1.
-  assert (length l' <> 0).
-  {
-     destruct l'.
-     + contradiction.
-     + simpl.
-        lia.
-  }
-  lia.
-Qed.
-
-
-(*----------------------又是一个发现没法证明的命题，，，，，-------------------*)
-Lemma eval_ins_mono:
-  forall (x y:(ins*nat)) (s1:pc_state) (s2:list act_state) (s3:pc_state), eval_ins x s1 s2 s3 /\ eval_ins y s1 s2 s3 -> x = y.
-Proof.
-  intros.
-  destruct H.
-  unfold eval_ins in H.
-  unfold eval_ins in H0.
-  destruct x.
-  destruct y.
-  destruct i;inversion H;clear H;     subst.
-  + destruct i0;inversion H0;clear H0;subst;simpl in *.
-     - tauto.
-     - pose proof stack_difference (program_state.stack (pc_state.state s1)) (program_state.stack (pc_state.state s3)) v dest cond H12 H5.
-        contradiction.
-    -  pose proof stack_difference (program_state.stack (pc_state.state s1)) (program_state.stack (pc_state.state s3)) v dest cond H13 H5.
-        contradiction.
-    - rewrite H5 in H13.
-    inversion H13.
-    pose proof stack_difference_2 (program_state.stack (pc_state.state s3)) (l) (add v1 v2) H15 H14.
-    contradiction.
-    - rewrite H5 in H13.
-    inversion H13.
-    pose proof stack_difference_2 (program_state.stack (pc_state.state s3)) (l) (mul v1 v2) H15 H14.
-    contradiction.
-    - rewrite H5 in H13.
-    inversion H13.
-    pose proof stack_difference_2 (program_state.stack (pc_state.state s3)) (l) (sub v1 v2) H15 H14.
-    contradiction.
-    - rewrite H5 in H12.
-      inversion H12.
-      rewrite <- H9 in H13.
-      assert ((pc_state.state s1).(memory) offset :: cond :: program_state.stack (pc_state.state s3) = [(pc_state.state s1).(memory) offset ; cond]++program_state.stack (pc_state.state s3)).
-      {
-        simpl.
-        tauto.
-      }
-      rewrite H in H13.
-      pose proof stack_difference_3 (program_state.stack (pc_state.state s3)) ([(pc_state.state s1).(memory) offset; cond]) (ltac:(discriminate)) H13.
-      contradiction.
-    - rewrite H2 in H16.
-      discriminate.
-    - rewrite H5 in H13.
-      assert (v :: dest :: cond :: program_state.stack (pc_state.state s3) = [v;dest;cond]++program_state.stack (pc_state.state s3)).
-      {
-        simpl.
-        tauto.
-      }
-      rewrite H in H13.
-      pose proof stack_difference_3 (program_state.stack (pc_state.state s3)) ([v; dest; cond]) (ltac:(discriminate)) H13.
-      contradiction.
-  + destruct i0;inversion H0;clear H0;subst;simpl in *.
-      - pose proof stack_difference (program_state.stack (pc_state.state s1)) (program_state.stack (pc_state.state s3)) v dest cond H5 H11.
-        contradiction.
-      - tauto.
-      -  (*这种情况没法证明*)
-Abort.
-(*-------------改成证明只有pc相同----------------------*)
-
-Lemma eval_ins_same_pc:
-  forall (x y:(ins*nat)) (s1:pc_state) (s2:list act_state) (s3:pc_state) (ins0 ins1:ins) (pc0 pc1:nat), x =(ins0,pc0)->y=(ins1,pc1)->eval_ins x s1 s2 s3 /\ eval_ins y s1 s2 s3 -> pc0=pc1.
-Proof.
-  intros.
-  destruct H1.
-  subst.
-  unfold eval_ins in H1.
-  unfold eval_ins in H2.
-  destruct ins0;destruct ins1;inversion H1;clear H1;inversion H2;clear H2;subst;tauto.
-Qed.
 
 Theorem completeness_of_protocol:
 forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace:
@@ -464,15 +32,14 @@ list CPU_state)
   CPU_trace = rm_last_CPU_trace ++ [last_CPU_state] ->
   length rm_last_CPU_trace = length action_trace -> (* 新增条件 *)
   program <> [] -> (* 新增条件 *)
-  In (last_CPU_state.(inst), last_CPU_state.(pc)) (combine program (seq 0
-  (length program))) -> (* 新增条件 *)
+  multiset_constraint CPU_trace program -> (* 新增条件 *)(*Used to be like last version,now no difference*)
   (exists (mem_list: list (int256 -> int256))(first_mem last_mem: int256 ->
   int256),
   length mem_list = length action_trace /\
   eval_ins_list program
   (combine_to_pc_state first_CPU_state first_mem)
   (combine_to_act_state_list rm_last_CPU_trace mem_list action_trace) (* 注
-  意这里 combine_to_act_state_list 是用 combine 实现的，不要求 rm_last_CPU_trace
+  意这里 combine_to_act_state_list 是用 combine 实现的，不要求 rm_last_CPU_trace 
   和 mem_list 以及 action_trace 长度相等 *)
   (combine_to_pc_state last_CPU_state last_mem))
   -> exists (memory_trace: list action_type), constraints program CPU_trace
@@ -517,13 +84,16 @@ Proof.
         * tauto.
         * tauto.
         * apply adjacent_CPU_state_nil.
-      - apply trace_multiset with (program:= program) (CPU_trace:= [last_CPU_state]).
+      - tauto.
+       (*apply trace_multiset with (program:= program) (CPU_trace:= [last_CPU_state]).
         destruct program.
         * contradiction.
         * simpl in *.
           right.
           ++ tauto.
           ++ apply Forall_nil.
+          fu*k multiset    ******** ****** ,**** !@#$%^&*( *&^%$ zaku zaku
+          *)
       - apply ActionListTraceNil.
       - apply trace_action with (CPU_trace:=[last_CPU_state]) (action_trace:=[]).
         apply adjacent_CPU_state_for_action_trace_nil with (x:= last_CPU_state).
@@ -664,6 +234,7 @@ Proof.
     1. in_list_first_mem :: rm_first_mem_list
     2. rm_last_mem_list ++ [in_list_last_mem]*)
     (*-----------由program不为空，则可以找到第一个(最后一个)inst------------*)
+    
      assert (exists (inst0:ins)(rm_first_program:list ins),inst0::rm_first_program = program).
      {
         destruct program.
@@ -671,8 +242,9 @@ Proof.
         + exists i,program.
             tauto.
      }
-     destruct H as [inst0[rm_first_prgram ?]].
+     destruct H as [inst0[rm_first_program ?]].
      subst;clear H3.
+     
      (*----------------------program成功拆封------------------------------*)
      (*现在就剩两个条件，一个是满足自反传递闭包，一个是满足时间戳可以用，需要推出倒数第二个在program里面，之前尝试化简时间戳不太成功，这次事实化简第一个条件*)
      (*-==============化简自反传递闭包==============*)
@@ -700,13 +272,26 @@ Proof.
       destruct H as [second_pc_state [first_act_trace [remain_act_trace ? ]]].
       destruct H as [? [? ?]].
       inversion H3;clear H3;subst.
+
+      pose proof one_step_generate_one_action ({|
+          pc_state.pc := first_CPU_state.(pc);
+          pc_state.state :=
+            {|
+              memory := fun _ : int256 => zero;
+              program_state.stack := first_CPU_state.(stack)
+            |}
+        |}) second_pc_state first_act_trace (inst0 :: rm_first_program) 0 H13.
       rewrite H14 in H13.
       rewrite H10 in H13.
       simpl in H13.
-      assert (first_act_trace <> []).
-      {
-        
-      }
+      pose proof length_one_iff_single first_act_trace .
+      destruct H15.
+      clear H16.
+      pose proof H15 H3;clear H3 H15.
+      destruct H16 as [first_act ?].
+      subst.
+      inversion H;clear H.
+      Check fold_ins_sem.
       (*----------化简得到3个条件-----------
       1. 已知了action_trace的第一个
       2. 已知第一步的单步
@@ -717,13 +302,16 @@ Proof.
       (*给条件的是最后一个不方便证明，前面按道理都可以证明，所以有没有可能*)
       (*是归纳地证明，第一个可以，然后前一个可以则后一个可以*)
       (*-------------对这第一步的单步化简---------------*)
-
-            inversion H13;clear H13.
-            - admit.
-           - sets_unfold in H3.
-             Check eval_ins_same_pc.
-             pose proof eval_ins_same_pc.
-             Check out_property.
+      (*-----------------unfold H4------------------------------*)
+      Admitted.
+      (*
+      inversion H13;clear H13.
+      - admit.
+     - sets_unfold in H.
+       try contradiction.
+       Check eval_ins_same_pc.
+       pose proof eval_ins_same_pc.
+       Check out_property.
       assert(exists (inst0':ins),eval_ins (inst0', 0)
         {|
           pc_state.pc := 0;
@@ -731,8 +319,15 @@ Proof.
             {|
               memory := fun _ : int256 => zero; program_state.stack := []
             |}
-        |} first_act_trace second_pc_state).
-        {
+        |} [first_act] second_pc_state).
+        {admit.
+        (*
+           revert 
+           
+           + simpl in H3;contradiction.
+           + simpl in H3;destruct H3.
+              - destruct a;inversion H3;simpl in H17;discriminate.
+              - 
            inversion H12;clear H12.
            + rewrite H0 in H16.
               inversion H16.
@@ -749,16 +344,17 @@ Proof.
               simpl in H.
               destruct first_act_trace.
               - simpl in H3.
+              admit.*)
         }
       
       
-      pose proof out_property (inst0,0) (combine rm_first_prgram(seq 1 (Datatypes.length rm_first_prgram))) eval_ins ({|
+      pose proof out_property (inst0,0) (combine rm_first_program(seq 1 (Datatypes.length rm_first_program))) eval_ins ({|
          pc_state.pc := 0;
          pc_state.state :=
            {|
              memory := fun _ : int256 => zero; program_state.stack := []
            |}
-       |}) first_act_trace second_pc_state inst0 0 rm_first_prgram (seq 1 (Datatypes.length rm_first_prgram)) H13 H3.
+       |}) [first_act] second_pc_state inst0 0 rm_first_program (seq 1 (Datatypes.length rm_first_program)) H3 H.
        
     assert (eval_ins (inst0, 0)
         {|
@@ -782,716 +378,4 @@ Proof.
       (*------------------------证明单射(由于太长已经移到Lemma里面了)-----------------------------*)
       
 Admitted.
-(*
-      inversion H13;clear H13.
-      - admit.
-      - sets_unfold in H3.
-        Search (map ?f ?l).
-        Search (fold_right ?f ?a ?l ?s1 ?s2 ?s4).
-        Check eval_ins.
-      
-      
-      assert(In (first_CPU_state.(inst),first_CPU_state.(pc)) (combine (inst0 :: rm_first_prgram)
-   (seq 0 (Datatypes.length (inst0 :: rm_first_prgram))))).
-   {
-      rewrite H14.
-      simpl.
-      left.
-     } 
-      (*以下为处理时间戳的废弃代码*)
-       rewrite H8 in H1.
-       rewrite H5 in H1.
-       unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H9.
-       rewrite H10 in H9.
-       rewrite H0 in H9.
-       rewrite H12 in H9.
-       simpl in H9.
-     inversion H9;clear H9. (*该步对时间戳分类讨论*)
-     - (*以下为时间戳只有一个，即只运行一步的情况*)
-        pose proof map_nil (fun x : CPU_state * (int256 -> int256) * action_type =>
-         {|
-           pc := (fst (fst x)).(pc);
-           state :=
-             {|
-               memory := snd (fst x);
-               program_state.stack := (fst (fst x)).(stack)
-             |};
-           action := snd x
-         |}) (combine (combine rm_first_last_CPU_trace rm_first_mem_list)
-           rm_first_action_trace).
-       pose proof H9 H11.
-       clear H9 H11.
-       rename x0 into first_pc_state.
-       (*
-      pose proof cons_before_nil x0 ({| pc := 0 ; state := {| memory := first_mem_in_list; program_state.stack := [] |}; action := first_action |}) (map (fun x : CPU_state * (int256 -> int256) * action_type => {| pc := (fst (fst x)).(pc); state := {| memory := snd (fst x); program_state.stack := (fst (fst x)).(stack) |}; action := snd x |})
-          (combine (combine rm_first_last_CPU_trace rm_first_mem_list) rm_first_action_trace)).
-       pose proof H9 H8;clear H8 H9.*)
-       simpl in H7.
-       
-       destruct H13.
-       pose proof H1;clear H1.
-       rename x into n.
-       inversion H;clear H.
-       rewrite H14 in H8.
-       rewrite H5 in H8.
-       subst.
-      pose proof H6.
-      pose proof H0.
-      pose proof H12.
-      pose proof H10.
-      clear H6 H0 H12 H10.
-      rewrite H1 in H13.
-            rewrite H7 in H13.
-                  rewrite H8 in H13.
-          unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H13.
-                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H13.
-        rewrite H14 in H13.
-                rewrite H5 in H13.
-        simpl in H13.
-        rewrite H9 in H13.
-        assert (n=1).
-        {
-            destruct n.
-            + simpl in H13;sets_unfold in H13;inversion H13;inversion H0.
-            + destruct n.
-                - tauto.
-                - simpl in H13;sets_unfold in H13;pose proof H13;clear H13.
-                  simpl in H0.
-                  destruct H0 as [unknow_pc_state [act_trace_1 [act_trace_2 ?] ]].
-                  destruct H0 as [? [? [? [? [? [? [? ?]]]] ]]]. 
-                  rename unknow_pc_state into run_one_step_pc_state.
-                  rename x into run_two_step_pc_state.
-                  inversion H6;clear H6.
-                  subst.
-                  unfold fold_ins_sem in H15.
-                  sets_unfold in H15.
-                  assert (exists (inst0 inst1:ins)(remain_program:list ins) ,inst0::inst1::remain_program = program).
-                  {
-                    destruct program.
-                    + contradiction.
-                    + destruct program.
-                       - inversion H12;clear H12;subst.
-                         unfold fold_ins_sem in H6.
-                         sets_unfold in H6.
-                         destruct i.
-                         * (*jimpi*)
-                         inversion H15;clear H15.
-                         unfold eval_ins in H10.
-                         inversion H10;clear H10.
-                         inversion H6;clear H6.
-                         unfold eval_ins in H10.
-                         inversion H10.
-                         subst.
-                         simpl in *.
-                         inversion H18.
-                          ++ simpl in *. contradiction.
-                          ++ simpl in *. contradiction.
-                          * (*jump*)
-                                                   inversion H15;clear H15.
-                         unfold eval_ins in H10.
-                         inversion H10;clear H10.
-                         inversion H6;clear H6.
-                         unfold eval_ins in H10.
-                         inversion H10.
-                         subst.
-                         simpl in *.
-                         inversion H18.
-                          ++ simpl in *. contradiction.
-                          ++ simpl in *. contradiction.
-                          * (*pop*)
-                                                   inversion H15;clear H15.
-                         unfold eval_ins in H10.
-                         inversion H10;clear H10.
-                         inversion H6;clear H6.
-                         unfold eval_ins in H10.
-                         inversion H10.
-                         subst.
-                         simpl in *.
-                         inversion H18.
-                          ++ simpl in *. inversion H19.
-                          ++ simpl in *. inversion H19.
-                          ++ simpl in *. contradiction.
-                          * (*add*)
-                                                   inversion H15;clear H15.
-                         unfold eval_ins in H10.
-                         inversion H10;clear H10.
-                         inversion H6;clear H6.
-                         unfold eval_ins in H10.
-                         inversion H10.
-                         subst.
-                         simpl in *.
-                         inversion H18.
-                          ++ simpl in *. inversion H19.
-                          ++ simpl in *. inversion H19.
-                          ++ simpl in *. contradiction.
-                          * (*mul*)
-                                                   inversion H15;clear H15.
-                         unfold eval_ins in H10.
-                         inversion H10;clear H10.
-                         inversion H6;clear H6.
-                         unfold eval_ins in H10.
-                         inversion H10.
-                         subst.
-                         simpl in *.
-                         inversion H18.
-                          ++ simpl in *. inversion H19.
-                          ++ simpl in *. inversion H19.
-                          ++ simpl in *. contradiction.
-                          * (*sub*)
-                                                   inversion H15;clear H15.
-                         unfold eval_ins in H10.
-                         inversion H10;clear H10.
-                         inversion H6;clear H6.
-                         unfold eval_ins in H10.
-                         inversion H10.
-                         subst.
-                         simpl in *.
-                         inversion H18.
-                          ++ simpl in *. inversion H19.
-                          ++ simpl in *. inversion H19.
-                          ++ simpl in *. contradiction.
-                          * (*mload*)
-                                                   inversion H15;clear H15.
-                         unfold eval_ins in H10.
-                         inversion H10;clear H10.
-                         inversion H6;clear H6.
-                         unfold eval_ins in H10.
-                         inversion H10.
-                         subst.
-                         simpl in *.
-                         inversion H18.
-                          ++ simpl in *. contradiction.
-                          ++ simpl in *. contradiction.
-                          * (*mstore*)
-                                                   inversion H15;clear H15.
-                         unfold eval_ins in H10.
-                         inversion H10;clear H10.
-                         inversion H6;clear H6.
-                         unfold eval_ins in H10.
-                         inversion H10.
-                         subst.
-                         simpl in *.
-                         inversion H18.
-                          ++ simpl in *. contradiction.
-                          ++ simpl in *. contradiction.
-                          * (*push*)
-                                                   inversion H15;clear H15.
-                         unfold eval_ins in H10.
-                         inversion H10;clear H10.
-                         inversion H6;clear H6.
-                         unfold eval_ins in H10.
-                         inversion H10.
-                         subst.
-                         inversion H10.
-                         simpl in *.
-                          ++ simpl in *. subst. inversion H0.
-                          ++ simpl in *. contradiction.
-                          ++ simpl in *. contradiction.
-                      - exists i,i0,program.
-                        tauto.
-                  }
-                  destruct H6 as [inst0 [inst1 [remain_program]]].
-                  subst.
-                  inversion H12;clear H12;subst.
-                  unfold fold_ins_sem in H6;sets_unfold in H6.
-                  assert (exists (a:act_state), act_trace_1 = [a]).
-                  {
-                    
-                  }
-        }
-        assert (In (last_two_2_CPU_state.(inst), last_two_2_CPU_state.(pc))
-       (combine program (seq 0 (Datatypes.length program)))).
-       {
-        + destruct last_two_2_CPU_state.
-       }
-       destruct n.
-       * inversion H13;clear H13.
-          sets_unfold in H1.
-          simpl in H14,H1.
-          unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H1.
-          rewrite H10 in H1.
-          rewrite H0 in H1.
-          rewrite H12 in H1.
-          inversion H1.
-       * (*当n不等于0的情况，其实就是要找n=1的情况，所以还要对S n的n归纳*)
-          destruct n.
-          ++ inversion H13;clear H13.
-                simpl in H1.
-                sets_unfold in H1.
-                destruct H1 as [act_1 [act_2 [H1 [? [? ?]]]]].
-                subst.
-                inversion H13;clear H13;subst.
-                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H8.
-                unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H1.
-                rewrite H10 in H1.
-                rewrite H0 in H1.
-                rewrite H12 in H1.
-                simpl in H1.
-                assert (exists (a:act_state)(rm_a_action:list act_state), a::rm_a_action=act_1).
-                {
-                   destruct act_1.
-                  +inversion H1.
-                  + exists a,act_1.
-                      tauto.
-                }
-                destruct H13 as [first_act [rm_first_act ?] ].
-                subst.
-                inversion H1;clear H1.
-                destruct first_action.
-                simpl in H11.
-
-                unfold fold_ins_sem in H8.
-                sets_unfold in H8.
-                inversion H;clear H.
-                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H5.
-                inversion H5;clear H5.
-                simpl in H.
-                unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H7.
-                inversion H7;clear H7.
-                subst.
-                rewrite H6 in H8.
-                rewrite H5 in H8.
-                assert (rm_first_act = []).
-                {
-                  destruct rm_first_act.
-                  + tauto.
-                  + Print fold_right.
-                      destruct program.
-                      - contradiction.
-                      - simpl in H8.
-                        destruct H8.
-                        * destruct i;inversion H.
-                        * destruct program.
-                          ++ simpl in H. contradiction.
-                          ++ simpl in H.
-                                destruct H.
-                                -- destruct i0;inversion H.
-                                -- inversion H4.
-                                    ** inversion H0.
-                                        subst.
-                                        rewrite <- H10 in H.
-                                        destruct program.
-                                        +++ simpl in H;contradiction.
-                                        +++ simpl in H.
-                                                 destruct H.
-                                                 --- destruct i;inversion H.
-                                                 ---
-                }   
-                subst.
-                simpl in H8.
-                assert(rm_first_last_CPU_trace = [] /\ rm_first_mem_list = [] /\ rm_first_action_trace).
-                destruct mem_ins0.
-                -- exists [({| timestamp := timestamp0; mem_ins := read address value |})].
-                
-                   inversion H8.
-                destruct program. (*对program归纳，找到运行的第一步*)
-                -- contradiction.
-                -- inversion H8.
-                   ** destruct i.
-                       +++ inversion H13.
-                
-
-       
-       
-       
-       
-       unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H1.
-       pose proof cons_eq rm_last_two_2_CPU_state l .
-       pose proof cons_eq last_action_trace rm_last_action_trace.
-      destruct H11 as [first [last_two ?]].
-       destruct H12 as [firsxt_ [rm_first ?]].
-     - destruct mem_list.
-       * inversion H9. 
-          rewrite H12 in H14.
-          inversion H14.
-      * rewrite H11 in H10.
-         rewrite H12 in H10.
-         inversion H10.
-    - unfold combine_to_act_state_list in H1.
-      pose proof cons_eq rm_last_two_2_CPU_state l .
-      pose proof cons_eq last_action_trace rm_last_action_trace.
-      destruct H11 as [first [last_two ?]].
-      destruct H13 as [first_ [rm_first ?]].
-      rewrite H11 in H1.
-      rewrite H13 in H1.
-      simpl in H1.
-      destruct mem_list.
-      * inversion H1.
-      * inversion H1;clear H1.
-         rewrite  H0 in H11.
-         inversion H11;clear H11.
-         subst.
-         destruct mem_list.
-         ++ inversion H9;clear H9.
-               pose proof length_one_iff_single (rm_last_action_trace ++ [last_action_trace]).
-               destruct H1.
-               clear H9.
-               symmetry in H11.
-               pose proof H1 H11;clear H1.
-               destruct H9.
-               pose proof app_after_nil_1 rm_last_action_trace.
-               specialize (H9 last_action_trace x).
-               pose proof H9 H1;clear H1 H9.
-               rewrite H11 in H2.
-               destruct l.
-               -- subst.
-                  simpl in H12.
-                  inversion H12.
-                  destruct x0.
-                  ** simpl in H1;sets_unfold in H1;destruct H1.
-                      unfold combine_to_act_state_list in H1.
-                      inversion H1.
-                  ** simpl in H1;sets_unfold in H1.
-                      destruct H1 as [i0 [i1[i2 [? [? ?]]]]].
-                      pose proof Definition_and_soundness.one program i1  (combine_to_pc_state first first_mem)  i0.
-                      destruct H15.
-                      +++ 
-                  admit.
-               -- inversion H2. (*q.e.d*)
-               destruct last_action_trace.
-               destruct mem_ins0.
-               -- exists [{| timestamp := timestamp0; mem_ins := read address value |}].
-                  split.
-               
-               pose proof cons_eq last_action_trace rm_last_action_trace .
-               destruct H9 as [y [l' ?]].
-               rewrite H9 in H1.
-               inversion H1;clear H1.
-               subst.
- unfold combine in H10.
-          simpl in H10.
-     simpl in H12.
-     rename H12 into H1.
-     destruct H1 as [n ?].
-     destruct n.
-     - simpl in H1.
-       sets_unfold in H1.
-       destruct H1.
-       unfold combine_to_act_state_list,combine_to_act_state in H1.
-       simpl in H1.
-     assert (In (rm_last_two_2_CPU_state.(inst), rm_last_two_2_CPU_state.(pc))
-       (combine program (seq 0 (Datatypes.length program)))).
-{
-     
-}
- (*接下来已知最后一个可达，证明倒数第二个也可达*)
-     pose proof H8 
-     inversion H6.
-     assert(exists m:list action_type, filter mem_ins_type_is_not_non m = m /\ Permutation m action_trace /\ increase_mem_trace m).
-{
-  exists (filter mem_ins_type_is_not_non action_trace).
-  apply rev_ind with (l := action_trace).
-  + simpl;tauto.
-  + intros.
-      pose proof filter_cons_app mem_ins_type_is_not_non l [x].
-      rewrite H0.
-      pose proof filter_cons_app mem_ins_type_is_not_non (filter mem_ins_type_is_not_non l) (filter mem_ins_type_is_not_non [x]).
-      rewrite H1.
-      rewrite H.
-     destruct x.
-     destruct mem_ins0.
-      - tauto.
-      - tauto.
-      - tauto.
-}
-          tauto.
-        simpl.
-        unfold In.
-        simpl.
-        tauto.
-        * unfold combine_to_act_state_list in H0.
-           simpl in H0.
-           unfold combine_to_pc_state in H0.
-           unfold Definition_and_soundness.Build_program_state,Definition_and_soundness.Build_pc_state in H0.
-           sets_unfold in H0.
-           inversion H0;clear H0.
-           inversion H4;clear H4.
-
-
-        destruct program.
-        ++ contradiction.
-        ++ destruct i.
-              -- simpl.
-                 right.
-                 ** left.
-
-unfold combine_to_act_state_list in H0.
-           simpl in H0.
-           unfold combine_to_pc_state in H0.
-           unfold Definition_and_soundness.Build_program_state,Definition_and_soundness.Build_pc_state in H0.
-           destruct x0.
-           ++
-            admit.
-           ++ simpl in H0. 
-                 sets_unfold in H0.
-                 destruct H0 as[x [y [z []]]].
-                  Search (?l = []).
-                 pose proof app_eq_nil y z H0;clear H0 H.
-                 destruct H4; subst.
-                 destruct H3.
-                 inversion H;clear H;subst.
-                 unfold fold_ins_sem in H3.
-                 simpl in H3.
-                 sets_unfold in H3.
-                 inversion H3;clear H3.
-                 -- destruct i;inversion H.
-                 -- unfold fold_right in H.
-                     rewrite H2,H13 in H.
-                     unfold eval_ins in H.
-                     destruct program;inversion H.
-                     ** destruct i0;inversion H3.
-                     **
-                        
-                    simpl in H.
-                     
-                  Print nsteps.
-(*
-                 pose proof Definition_and_soundness.one (i :: program) [] ({|
-        pc_state.pc := last_CPU_state.(pc);
-        pc_state.state :=
-          {|
-            memory := fun _ : int256 => zero;
-            program_state.stack := last_CPU_state.(stack)
-          |}
-      |}) x.
-*)
-                  H0.
-            inversion H3;clear H3.
-
-            subst.
-            
-            
-
-
-
-
-
-
-  +
-  intros program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace.
-  revert program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state.
-  destruct H as [memory_trace ?].
-
-
-
-
-
- intros program CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace H H0.
-        exists  (filter mem_ins_type_is_not_non action_trace).
-       subst.
-      symmetry in H0.
-      pose proof app_after_nil_1 rm_last_CPU_trace last_CPU_state first_CPU_state H0.
-      pose proof app_after_nil_2 rm_last_CPU_trace last_CPU_state first_CPU_state H0.
-      clear H0.
-      intros.
-(*
-在这里得到H : rm_last_CPU_trace = []
-H2 : last_CPU_state = first_CPU_state
-*)
-      destruct H1 as [mem_list [first_mem [last_mem [H1 H3]]]].
-      inversion H3.
-      clear H3.
-      simpl in *.
-      Search combine.
-      Print combine.
-      split.
-      - apply trace_CPU with (rm_first_CPU_trace:=[]) (first_CPU_state:=first_CPU_state).
-        * tauto.
-        * tauto.
-        * tauto.
-        * pose proof adjacent_CPU_state_nil eval_constraint first_CPU_state.
-          tauto.
-      - apply trace_multiset with (program := program) (CPU_trace:= [first_CPU_state]).
-        simpl.
-        rewrite H0.
-        Print In.
-        destruct first_CPU_state as [? ? ?].
-        subst.
-         destruct inst0.
-          ++
-              simpl in *.
-              Print Rels.RELS_ID.
-              unfold combine_to_act_state_list in *.
-              simpl in *.
-              clear H6.
-              (pose proof Definition_and_soundness.one program [] 
-(combine_to_pc_state {| CPU_state.pc := pc0; stack := stack0; inst := JUMPI |} (fun _ : int256 => zero)) 
-(combine_to_pc_state {| CPU_state.pc := pc0; stack := stack0; inst := JUMPI |} last_mem) ).
-              unfold nsteps in H7.
-              destruct H7 as [n ?].
-              destruct n.
-              Print nsteps.
-              simpl in H2.
-
-
-
-              unfold fold_ins_sem,fold_right in H.
-              simpl in H.
-              inversion H7.
-              unfold combine_to_pc_state in H7.
-              simpl in H7.
-              inversion H7.
-              discriminate.
-              
-            
-          assert (length program = 1).
-          {
-
-          }
-      - admit.
-      - admit.
-      - admit.
-      - admit.
-      - admit.
-  + intros x l H Program CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state  action_trace memory_trace.
-     pose proof cons_app_eq first_CPU_state l.
-    destruct H0 as [last_two_2_CPU_state [rm_last_two_2_CPU_trace ?]].
-      
-      split.
-      - rewrite H1.
-        
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      pose proof cons_app_eq first_CPU_state l.
-      destruct H0 as [last_two_2_CPU_state [rm_last_two_2_CPU_trace ?]].
-     specialize (H Program rm_last_CPU_trace rm_last_two_2_CPU_trace first_CPU_state last_two_2_CPU_state).
-      intros H1 H2 H3.
-      destruct H3 as[mem_list [first_mem [last_mem []]]].
-      inversion H4.
-      inversion H9.
-      rename x1 into n.
-      clear H9.
-      subst.
-      assert (exists (x:action_type) (l:list action_type),l ++ [x]=action_trace).
-      {
-          admit.
-      }
-      assert (exists (x:action_type) (l:list action_type),l ++ [x]=memory_trace).
-      {
-          admit.
-      }
-      destruct H1 as [last_action [rm_last_action_trace ?]].
-      destruct H9 as [last_memory [rm_last_memory_trace ?]].
-      specialize (H rm_last_action_trace rm_last_memory_trace).
-      pose proof app_last_corr (first_CPU_state :: l) rm_last_CPU_trace x last_CPU_state H2.
-      destruct H10.
-      symmetry in H10.
-      pose proof H10.
-      rewrite H0 in H12.
-      pose proof H H10 H12.
-      clear H.
-      destruct H13.
-      assert (exists (x:int256->int256)(l:list (int256->int256)),l++[x]=mem_list).
-      {
-          admit.
-      }
-      destruct H as [last_two_2_mem [rm_last_mem_list ?]].
-      - exists rm_last_mem_list,first_mem,last_two_2_mem.
-        split.
-        * admit.
-        *  apply sigma.
-          ++ tauto.
-          ++ tauto.
-          ++ tauto.
-          ++ pose proof ActionListCons.
-                admit.
-          ++ simpl.
-                assert (exists (n0:nat),S n0 = n).
-                {
-                  admit.
-                }
-                destruct H13 as [n0 ?].
-                exists n0.
-                Print one.
-                admit.
-      -
-
-(* ∀x∀l(()->())->∀P...(()->()) *)
-
-
-
-
-
-
-
-  pose proof all_constraints.
-  inversion H.
-  split.
-   + apply trace_CPU with (rm_first_CPU_trace:=rm_first_CPU_trace) (first_CPU_state:=first_CPU_state).
-    - tauto.
-    - unfold combine_to_pc_state in *.
-      unfold Definition_and_soundness.Build_pc_state  in *.
-      unfold Definition_and_soundness.Build_program_state in *.
-      rewrite Heqx in H2.
-      simpl in H2.
-      tauto.
-   -  unfold combine_to_pc_state in *.
-      unfold Definition_and_soundness.Build_pc_state  in *.
-      unfold Definition_and_soundness.Build_program_state in *.
-      rewrite Heqx in H4.
-      simpl in H4.
-      tauto.
-    - destruct H6 as[n ?].
-       rewrite H.
-        revert H CPU_trace  rm_first_CPU_trace rm_last_CPU_trace.
-
-       apply rev_ind with (l:=rm_first_CPU_trace).
-       * pose proof adjacent_CPU_state_nil.
-          specialize (H7 eval_constraint first_CPU_state).
-          tauto.
-       * intros.
-          pose proof adjacent_CPU_state_cons.
-          pose proof cons_app_eq first_CPU_state.
-          specialize(H9 l).
-          destruct H9 as [last_two_CPU_state [rm_last_two_CPU_trace]].
-          specialize (H8 eval_constraint last_two_CPU_state x0 (rm_last_two_CPU_trace)).
-          rewrite H9 in H7.
-          assert (eval_constraint last_two_CPU_state x0).
-          {
-             destruct last_two_CPU_state.
-             unfold eval_constraint.
-              simpl in *.
-              destruct inst0.
-              +  pose proof jumpi_constraint.
-                  specialize (H10 ({| CPU_state.pc := pc0; stack := stack0; inst := JUMPI |}) x0 )
-}.
-Admitted.
-
-     induction n.
-      * simpl in H6.
-        destruct H6.
-        inversion H6.
-        rewrite H8 in H5.
-        rewrite Heqx in H7.
-        rewrite Heqz in H7.
-        inversion H7.
-      rewrite H.
-      induction rm_first_CPU_trace.
-      * simpl.
-        pose proof adjacent_CPU_state_nil.
-        pose proof adjacent_CPU_state_cons.
-        specialize (H0 eval_constraint last_CPU_state).
-        tauto.
-      * pose proof adjacent_CPU_state_nil.
-        pose proof adjacent_CPU_state_cons.
-        pose proof cons_app_eq a rm_last_CPU_trace.
-        destruct H9 as [last_two_CPU_trace [rm_last_two_CPU_trace ?]].
-        rewrite H9.
-        specialize (H8 eval_constraint last_two_CPU_trace last_CPU_state rm_last_two_CPU_trace).
-        apply H8.
-subst.
 *)

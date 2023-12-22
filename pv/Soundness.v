@@ -83,7 +83,9 @@ Proof.
       }
       { inversion H12. discriminate. }
     + apply app_eq_nil in H13. inversion H13. discriminate.
+    (*soundness从这里开始证明复杂情况*)
   - intros. subst. inversion H0. subst. rewrite H2 in H0, H1, H3, H5, H8.
+    (*由完整的程序满足约束，推出部分程序满足约束*)
     assert (action_trace_constraint rm_last_CPU_trace l).
     {
       apply trace_action.
@@ -191,6 +193,7 @@ Proof.
       apply H15.
       apply public.
     }
+    (*----到这里完成对除去最后一步的程序满足约束---------------*)
     assert (exists (rm_first_CPU_trace'
     rm_last_CPU_trace' : list CPU_state)
     (first_CPU_state' last_CPU_state' : CPU_state),

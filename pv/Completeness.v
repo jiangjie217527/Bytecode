@@ -204,12 +204,12 @@ fold_right
 Proof.
   intros.
   assert (remain_program = []).
-  {admit. }
+  (*
   subst.
   simpl in H.
   destruct H.
   + destruct inst0;inversion H;discriminate.
-  + contradiction.
+  + contradiction.*)
 (*
   induction act_trace.
   + simpl in H.
@@ -255,7 +255,7 @@ Proof.
        * simpl in H1. 
 
 *)
- Admitted.
+Abort.
       
 Lemma map_nil:
   forall [A B:Type] (f:A->B) (l:list A),
@@ -267,6 +267,7 @@ Proof.
   + tauto.
   + simpl in H.
       discriminate.
+      Check Datatypes.length.
 Qed.
 
 
@@ -279,43 +280,180 @@ Qed.
 但是这两个的结果是s3,t3不同
 同理，如果一个读一个写，那就是s2,t2不同*)
 (*唯一确定的理由可能是eval_ins由后面三个参数可以得到确定的ins*nat *)
+(*但是单射这个条件太强了，其实pop 和jump就不是单射，可以inst不一样但是行为完全一样*)
+(*所以只能确定nat,所以这个定理确实不一定成立*)
+(*--------------x可能不在l里，但是x2一定在l的第二个里面 ---------------*)
+
 Lemma out_property:
-  forall (A B C D: Type) (x: A) (l: list A) (f: A -> B -> C -> D -> Prop)  (s1: B)(s2: C)(s3: D),
-  (forall (x y:A) (s1:B) (s2:C) (s3:D), f x s1 s2 s3 /\ f y s1 s2 s3 -> x = y ) -> f x s1 s2 s3 -> fold_right Sets.union ∅ (map f l) s1 s2 s3 -> In x l \/ False.
+  forall [A B C D:Type] (x:A*nat) (l: list (A*nat)) (f: (A*nat) -> B -> C -> D -> Prop)  (s1: B)(s2: C)(s3: D) (x1:A)(x2:nat)(l1:list A)(l2:list nat),
+  (forall (x y:A*nat) (s1:B) (s2:C) (s3:D) (x1 x2:A)(y1 y2:nat), x = (x1,y1)-> y=(x2,y2)-> f x s1 s2 s3 /\ f y s1 s2 s3 -> y1 = y2 ) -> fold_right Sets.union ∅ (map f l) s1 s2 s3 -> f x s1 s2 s3 -> x = (x1,x2) -> l = (combine l1 l2) ->length l1 = length l2->In x2 l2.
 Proof.
-  intros.
-  left.
-  induction l as [| y l' IHl'].
-  + simpl in H1.
-     inversion H1.
-  + simpl.
-     inversion H1. 
-     - left.
-      specialize (H x y s1 s2 s3).
-      destruct H.
-      * split;tauto.
-      * tauto.
-     - pose proof IHl' H2.
-      right.
+  intros A B C D x l f s1 s2 s3 x1 x2 l1 l2.
+  revert x  f s1 s2 s3 x1 x2 l1 l2.
+  induction l.
+  + intros.
+       destruct l2.
+     - contradiction.
+     - simpl in H4.
+       symmetry in H4.
+       pose proof len_succ l1 (Datatypes.length l2) H4.
+       destruct H5 as [? [? ?]].
+       rewrite H5 in H3.
+       inversion H3.
+  + intros.
+    assert (exists (ins0:A) (l':list A),l1 = ins0::l').
+    {
+      destruct l1.
+      inversion H3.
+      exists a0,l1.
       tauto.
+    }
+    destruct H5 as [ins0 [l12 ?]].
+    subst.
+     destruct l2.
+     - inversion H4.
+      (*
+       pose proof length_zero_iff_nil l1.
+       destruct H6;clear H8.
+       pose proof H6 H7.
+       contradiction.*)
+     - inversion H0;clear H0.
+       * destruct a;subst.
+         specialize (H (x1,x2) (a,n0) s1 s2 s3 x1 a x2 n0).
+         pose proof H (ltac:(tauto)) (ltac:(tauto));clear H.
+         destruct H0.
+         split;tauto.
+         inversion H3.
+         unfold In.
+         left.
+         tauto.
+       * inversion H3;clear H3. 
+       inversion H4;clear H4.
+         specialize (IHl (x1,x2) f s1 s2 s3 x1 x2 l12 l2).
+         pose proof IHl H H2 H1 (ltac:(tauto)) H6 H3;clear IHl. (*(ltac:(tauto)) (ltac:(tauto));clear H*)
+         unfold In.
+         right.
+         tauto.
 Qed.
 
-Theorem eval_ins_mono:
+Lemma stack_difference_2:
+  forall [A:Type] (l l':list A)(a:A),
+  l = l' -> l = a::l' -> False.
+Proof.
+  intros.
+  rewrite H in H0.
+  assert (length (a :: l') <>length l' ).
+   {
+    simpl.
+    pose proof Nat.neq_succ_diag_l (Datatypes.length l').
+    tauto.
+   }
+   rewrite <- H0 in H1.
+   contradiction.
+Qed.
+Lemma stack_difference:
+  forall [A:Type] (l l':list A)(a b c:A),
+  l = a:: l' -> l = b :: c :: l'->False.
+Proof.
+  intros.
+  rewrite H in H0.
+   inversion H0.
+   pose proof stack_difference_2 l' l' c (ltac:(tauto)) H3.
+   tauto.
+Qed.
+
+Lemma  stack_difference_3:
+  forall  [A:Type] (l l':list A),
+  l' <> [] -> l = l' ++ l -> False.
+Proof.
+  intros.
+  assert (length l = length (l' ++ l)).
+  {
+    rewrite <- H0.
+    tauto.
+  }
+  pose proof app_length l' l.
+  rewrite H2 in H1.
+  assert (length l' <> 0).
+  {
+     destruct l'.
+     + contradiction.
+     + simpl.
+        lia.
+  }
+  lia.
+Qed.
+
+
+(*----------------------又是一个发现没法证明的命题，，，，，-------------------*)
+Lemma eval_ins_mono:
   forall (x y:(ins*nat)) (s1:pc_state) (s2:list act_state) (s3:pc_state), eval_ins x s1 s2 s3 /\ eval_ins y s1 s2 s3 -> x = y.
 Proof.
   intros.
   destruct H.
   unfold eval_ins in H.
   unfold eval_ins in H0.
-  destruct s11.
   destruct x.
   destruct y.
-  destruct i.
-  + inversion H;clear H;     subst.
-     destruct i0;inversion H0;clear H0;subst;simpl in *.
+  destruct i;inversion H;clear H;     subst.
+  + destruct i0;inversion H0;clear H0;subst;simpl in *.
      - tauto.
-     -  
-Admitted.
+     - pose proof stack_difference (program_state.stack (pc_state.state s1)) (program_state.stack (pc_state.state s3)) v dest cond H12 H5.
+        contradiction.
+    -  pose proof stack_difference (program_state.stack (pc_state.state s1)) (program_state.stack (pc_state.state s3)) v dest cond H13 H5.
+        contradiction.
+    - rewrite H5 in H13.
+    inversion H13.
+    pose proof stack_difference_2 (program_state.stack (pc_state.state s3)) (l) (add v1 v2) H15 H14.
+    contradiction.
+    - rewrite H5 in H13.
+    inversion H13.
+    pose proof stack_difference_2 (program_state.stack (pc_state.state s3)) (l) (mul v1 v2) H15 H14.
+    contradiction.
+    - rewrite H5 in H13.
+    inversion H13.
+    pose proof stack_difference_2 (program_state.stack (pc_state.state s3)) (l) (sub v1 v2) H15 H14.
+    contradiction.
+    - rewrite H5 in H12.
+      inversion H12.
+      rewrite <- H9 in H13.
+      assert ((pc_state.state s1).(memory) offset :: cond :: program_state.stack (pc_state.state s3) = [(pc_state.state s1).(memory) offset ; cond]++program_state.stack (pc_state.state s3)).
+      {
+        simpl.
+        tauto.
+      }
+      rewrite H in H13.
+      pose proof stack_difference_3 (program_state.stack (pc_state.state s3)) ([(pc_state.state s1).(memory) offset; cond]) (ltac:(discriminate)) H13.
+      contradiction.
+    - rewrite H2 in H16.
+      discriminate.
+    - rewrite H5 in H13.
+      assert (v :: dest :: cond :: program_state.stack (pc_state.state s3) = [v;dest;cond]++program_state.stack (pc_state.state s3)).
+      {
+        simpl.
+        tauto.
+      }
+      rewrite H in H13.
+      pose proof stack_difference_3 (program_state.stack (pc_state.state s3)) ([v; dest; cond]) (ltac:(discriminate)) H13.
+      contradiction.
+  + destruct i0;inversion H0;clear H0;subst;simpl in *.
+      - pose proof stack_difference (program_state.stack (pc_state.state s1)) (program_state.stack (pc_state.state s3)) v dest cond H5 H11.
+        contradiction.
+      - tauto.
+      -  (*这种情况没法证明*)
+Abort.
+(*-------------改成证明只有pc相同----------------------*)
+
+Lemma eval_ins_same_pc:
+  forall (x y:(ins*nat)) (s1:pc_state) (s2:list act_state) (s3:pc_state) (ins0 ins1:ins) (pc0 pc1:nat), x =(ins0,pc0)->y=(ins1,pc1)->eval_ins x s1 s2 s3 /\ eval_ins y s1 s2 s3 -> pc0=pc1.
+Proof.
+  intros.
+  destruct H1.
+  subst.
+  unfold eval_ins in H1.
+  unfold eval_ins in H2.
+  destruct ins0;destruct ins1;inversion H1;clear H1;inversion H2;clear H2;subst;tauto.
+Qed.
 
 Theorem completeness_of_protocol:
 forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace:
@@ -559,8 +697,16 @@ Proof.
       subst.
       (*----------------完成对n的归纳,此时可以继续化简------------------*)
       simpl in H;sets_unfold in H.
-      destruct H as [second_pc_state [first_act_state [remain_act_state ? ]]].
+      destruct H as [second_pc_state [first_act_trace [remain_act_trace ? ]]].
       destruct H as [? [? ?]].
+      inversion H3;clear H3;subst.
+      rewrite H14 in H13.
+      rewrite H10 in H13.
+      simpl in H13.
+      assert (first_act_trace <> []).
+      {
+        
+      }
       (*----------化简得到3个条件-----------
       1. 已知了action_trace的第一个
       2. 已知第一步的单步
@@ -571,15 +717,66 @@ Proof.
       (*给条件的是最后一个不方便证明，前面按道理都可以证明，所以有没有可能*)
       (*是归纳地证明，第一个可以，然后前一个可以则后一个可以*)
       (*-------------对这第一步的单步化简---------------*)
-      inversion H3;clear H3;subst.
-      rewrite H14 in H13.
-      rewrite H10 in H13.
-      simpl in H13.
-      
+
             inversion H13;clear H13.
             - admit.
            - sets_unfold in H3.
+             Check eval_ins_same_pc.
+             pose proof eval_ins_same_pc.
+             Check out_property.
+      assert(exists (inst0':ins),eval_ins (inst0', 0)
+        {|
+          pc_state.pc := 0;
+          pc_state.state :=
+            {|
+              memory := fun _ : int256 => zero; program_state.stack := []
+            |}
+        |} first_act_trace second_pc_state).
+        {
+           inversion H12;clear H12.
+           + rewrite H0 in H16.
+              inversion H16.
+           + rewrite H0 in H15.
+              inversion H15;clear H15.
+              unfold combine_to_act_state,Definition_and_soundness.Build_program_state in H17.
+              inversion H17;clear H17;subst. 
+              simpl in H16.
+              pose proof map_nil (fun x : CPU_state * (int256 -> int256) * action_type =>
+         combine_to_act_state (fst (fst x)) (snd (fst x)) (snd x))
+        (combine (combine rm_first_last_CPU_trace rm_first_mem_list)
+           rm_first_action_trace) H18;clear H18.
+              rewrite H12 in H.
+              simpl in H.
+              destruct first_act_trace.
+              - simpl in H3.
+        }
       
+      
+      pose proof out_property (inst0,0) (combine rm_first_prgram(seq 1 (Datatypes.length rm_first_prgram))) eval_ins ({|
+         pc_state.pc := 0;
+         pc_state.state :=
+           {|
+             memory := fun _ : int256 => zero; program_state.stack := []
+           |}
+       |}) first_act_trace second_pc_state inst0 0 rm_first_prgram (seq 1 (Datatypes.length rm_first_prgram)) H13 H3.
+       
+    assert (eval_ins (inst0, 0)
+        {|
+          pc_state.pc := 0;
+          pc_state.state :=
+            {|
+              memory := fun _ : int256 => zero; program_state.stack := []
+            |}
+        |} first_act_trace second_pc_state).
+        {
+          unfold eval_ins.
+          destruct inst0.
+          + tauto.
+          }
+           Check  
+             (seq 1 (Datatypes.length rm_first_prgram)).
+             Check fold_right.
+             Print In.
       (*要想使用H13，就需要证明eval_ins是单射（见Out_property）*)
       (*要证明单射，就要用到时间戳，所以下面是处理时间戳来证明单射的代码*)
       (*------------------------证明单射(由于太长已经移到Lemma里面了)-----------------------------*)

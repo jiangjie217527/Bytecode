@@ -21,6 +21,142 @@ Import CPU_state.
 Import pc_state.
 Import act_state.
 
+Lemma cons_eq: forall {A : Type} (x : A) (l : list A), exists y l',  l ++ [x] = y:: l'.
+Proof.
+  intros.
+  revert x.
+  induction l. intros.
+  - exists x, []. reflexivity.
+  - intros. exists a, (l++[x]). reflexivity.
+Qed.
+(*not in:由pc越界推出矛盾*)
+Lemma zero_not_in_seq_one:
+  forall (x:nat),In 0 (seq 1 x) -> False.
+Proof.
+  intros.
+  pose proof in_seq x 1 0.
+  destruct H0;clear H1.
+  pose proof H0 H;clear H0.
+  destruct H1.
+  inversion H0.
+Qed.
+
+Lemma Forall_rev_tail:
+  forall [A : Type] [P : A -> Prop] [a : A] [l : list A],
+  Forall P (l++[a]) -> Forall P l.
+Proof.
+  intros.
+  induction l.
+  + apply Forall_nil.
+  + simpl in H.
+      pose proof Forall_inv_tail.
+      specialize (H0 A P a0 (l ++[a])).
+      pose proof H0 H.
+      pose proof IHl H1.
+      pose proof Forall_inv.
+      specialize (H3 A P a0 (l++[a])).
+      pose proof H3 H.
+      apply Forall_cons;tauto.
+Qed.
+
+Lemma multiset_subst:
+  forall (l:list CPU_state) (p:list ins) (a x:CPU_state),
+   multiset_constraint (a::l ++[x]) (p) -> multiset_constraint (a::l) (p).
+Proof.
+  intros.
+  inversion H;clear H;subst.
+  apply trace_multiset with(program:=p) (CPU_trace:=(a::l)).
+  pose proof Forall_rev_tail.
+   pose proof Forall_map (fun cpu_state : CPU_state => (cpu_state.(inst),cpu_state.(pc)))  (fun x : ins * nat =>
+        In x (combine ( p) (seq 0 (Datatypes.length (p)))))  (a :: l ++ [x]).
+    destruct H1 ;clear H2.
+    pose proof H1 H0. clear H1 H0.
+    
+  specialize (H CPU_state).
+  specialize (H (fun x : CPU_state => In (x.(inst), x.(pc)) (combine p (seq 0 (Datatypes.length p))))).
+  specialize (H x (a::l)).
+  pose proof H H2. clear H H2.
+     pose proof Forall_map (fun cpu_state : CPU_state => (cpu_state.(inst),cpu_state.(pc)))  (fun x : ins * nat =>
+        In x (combine ( p) (seq 0 (Datatypes.length (p)))))  (a :: l).
+   destruct H. clear H.
+   pose proof H1 H0.
+   tauto.
+Qed.
+(*
+   pose proof 
+
+  remember a.(inst) as inst0.
+  Check in_app_or.
+  
+ 
+   destruct H0. clear H2.
+   pose proof H0 H1;clear H0 H1.
+   pose proof Forall_rev.
+   specialize (H0 CPU_state (fun x : CPU_state => In (x.(inst), x.(pc)) (combine (inst0 :: p) (seq 0 (Datatypes.length (inst0 :: p)))))  (a :: l ++ [x])).
+   pose proof H0 H2;clear H0 H2.
+   simpl in H1.
+   inversion H1;clear H1;subst.
+  +
+     pose proof cons_eq a (rev (l ++ [x])).
+     destruct H0 as [? [? ?]].
+     symmetry in H2.
+     rewrite H0 in H2.
+     discriminate.
+   + pose proof rev_unit l x.
+      rewrite H1 in H0.
+      inversion H0;clear H0 H1.
+      subst.
+      
+      destruct l.
+      - simpl in H3.
+        discriminate.
+      - simpl in H2.
+   inversion H2.
+      simpl in H1.
+  Check Forall_forall.
+  
+  intros l.
+  
+  induction l.
+  + intros.
+      apply trace_multiset with(program:=(inst0::p)) (CPU_trace:=[a]).
+      simpl.
+      inversion H0;clear H0;subst.
+      simpl in H1.
+      inversion H1;clear H1;subst.
+      inversion H3;clear H3.
+      - right.
+        * left;tauto.
+        * left.
+      - rewrite H in H0.
+      Check in_combine_r.
+        pose proof in_combine_r p (seq 1 (Datatypes.length p)) a.(inst) 0 H0;clear H0.
+        pose proof zero_not_in_seq_one (Datatypes.length p) H1.
+        contradiction.
+  + intros.
+     
+  specialize (IHl p a x inst0).
+    pose proof IHl H;clear IHl.
+     simpl in H.
+     inversion H;subst;clear H.
+     simpl in H0.
+     inversion H0;clear H0;subst.
+     
+ *)
+     (*
+     Lemma subset:
+  forall [A:Type] (a x:A)(l:list A),
+  In (a::l) (a::l++[x]).
+     
+     *)
+
+Lemma cong:
+  forall [A:Type](a:A),
+  [a]<>[] -> [] <> [a].
+Proof.
+  congruence.
+  Qed.
+
 Lemma app_after_nil_1: forall {A: Type}(l : list A) (x y:A),(l ++ [x]) = [y] -> l = [] .
 Proof.
   intros.
@@ -60,15 +196,6 @@ Proof.
   split.
     + apply app_inj_tail in H. tauto.
     + apply app_inj_tail in H. tauto.
-Qed.
-
-Lemma cons_eq: forall {A : Type} (x : A) (l : list A), exists y l',  l ++ [x] = y:: l'.
-Proof.
-  intros.
-  revert x.
-  induction l. intros.
-  - exists x, []. reflexivity.
-  - intros. exists a, (l++[x]). reflexivity.
 Qed.
 
 Lemma filter_cons_app_single:
@@ -326,40 +453,47 @@ Qed.
 (*--------------x可能不在l里，但是x2一定在l的第二个里面 ---------------*)
 
 Lemma out_property:
-  forall [A B C D:Type] (x:A*nat) (l: list (A*nat)) (f: (A*nat) -> B -> C -> D -> Prop)  (s1: B)(s2: C)(s3: D) (x1:A)(x2:nat)(l1:list A)(l2:list nat),
-  (forall (x y:A*nat) (s1:B) (s2:C) (s3:D) (x1 x2:A)(y1 y2:nat), x = (x1,y1)-> y=(x2,y2)-> f x s1 s2 s3 /\ f y s1 s2 s3 -> y1 = y2 ) -> fold_right Sets.union ∅ (map f l) s1 s2 s3 -> f x s1 s2 s3 -> x = (x1,x2) -> l = (combine l1 l2) ->length l1 = length l2->In x2 l2.
+  forall [A B C D:Type]  (l: list (A*nat)) (f: (A*nat) -> B -> C -> D -> Prop)  (s1: B)(s2: C)(s3: D) (l1:list A)(l2:list nat),
+  (forall (x y:A*nat) (s1:B) (s2:C) (s3:D) (x1 x2:A)(y1 y2:nat), x = (x1,y1)-> y=(x2,y2)-> f x s1 s2 s3 /\ f y s1 s2 s3 -> y1 = y2 ) -> fold_right Sets.union ∅ (map f l) s1 s2 s3 -> l = (combine l1 l2) ->length l1 = length l2->(exists (x:A*nat),f x s1 s2 s3 /\ In x l).
 Proof.
-  intros A B C D x l f s1 s2 s3 x1 x2 l1 l2.
-  revert x  f s1 s2 s3 x1 x2 l1 l2.
+  intros A B C D l f s1 s2 s3 l1 l2.
+  revert f s1 s2 s3 l1 l2.
   induction l.
   + intros.
        destruct l2.
      - contradiction.
-     - simpl in H4.
-       symmetry in H4.
-       pose proof len_succ l1 (Datatypes.length l2) H4.
-       destruct H5 as [? [? ?]].
-       rewrite H5 in H3.
-       inversion H3.
+     - simpl in H2.
+       symmetry in H2.
+       pose proof len_succ l1 (Datatypes.length l2) H2.
+       destruct H3 as [? [? ?]].
+       rewrite H3 in H1.
+       inversion H1.
   + intros.
     assert (exists (ins0:A) (l':list A),l1 = ins0::l').
     {
       destruct l1.
-      inversion H3.
+      inversion H1.
       exists a0,l1.
       tauto.
     }
-    destruct H5 as [ins0 [l12 ?]].
+    destruct H3 as [ins0 [l12 ?]].
     subst.
      destruct l2.
-     - inversion H4.
+     - inversion H2.
       (*
        pose proof length_zero_iff_nil l1.
        destruct H6;clear H8.
        pose proof H6 H7.
        contradiction.*)
      - inversion H0;clear H0.
-       * destruct a;subst.
+       * exists a.
+          split.
+          ++ tauto.
+          ++ simpl.
+                left.
+                tauto.
+      (*
+        destruct a;subst.
          specialize (H (x1,x2) (a,n0) s1 s2 s3 x1 a x2 n0).
          pose proof H (ltac:(tauto)) (ltac:(tauto));clear H.
          destruct H0.
@@ -367,14 +501,25 @@ Proof.
          inversion H3.
          unfold In.
          left.
-         tauto.
-       * inversion H3;clear H3. 
-       inversion H4;clear H4.
-         specialize (IHl (x1,x2) f s1 s2 s3 x1 x2 l12 l2).
-         pose proof IHl H H2 H1 (ltac:(tauto)) H6 H3;clear IHl. (*(ltac:(tauto)) (ltac:(tauto));clear H*)
+         tauto.*)
+       * inversion H1;clear H1. 
+       inversion H2;clear H2.
+         specialize (IHl f s1 s2 s3 l12 l2).
+         pose proof IHl H H3 H5 H1 ;clear IHl.
+          (*(ltac:(tauto)) (ltac:(tauto));clear H*)
+         destruct H0 as [x [? ?]].
+         exists x.
+         split.
+         ++ tauto.
+         ++ simpl.
+                right.
+                rewrite <- H5.
+                tauto.
+         
+         (*
          unfold In.
          right.
-         tauto.
+         tauto.*)
 Qed.
 
 Lemma stack_difference_2:
@@ -495,3 +640,84 @@ Proof.
   unfold eval_ins in H2.
   destruct ins0;destruct ins1;inversion H1;clear H1;inversion H2;clear H2;subst;tauto.
 Qed.
+
+Lemma soudnness_subst:
+  forall (program : list ins) (inst0:ins)(first_CPU_state last_CPU_state last_two_2_CPU_state: CPU_state) ( rm_last_action_trace rm_first_action_trace: list action_type) (rm_last_two_CPU_trace rm_first_last_CPU_trace : list CPU_state) (first_action last_action:action_type),
+           (exists
+       (mem_list : list (int256 -> int256)) (first_mem
+                                             last_mem : 
+                                             int256 -> int256),
+       Datatypes.length mem_list = Datatypes.length (first_action :: rm_first_action_trace) /\
+       eval_ins_list (inst0 :: program)
+         (combine_to_pc_state first_CPU_state first_mem)
+         (combine_to_act_state_list (rm_last_two_CPU_trace++ [last_two_2_CPU_state]) mem_list (first_action :: rm_first_action_trace))
+         (combine_to_pc_state last_CPU_state last_mem))->
+  first_action :: rm_first_action_trace =
+     rm_last_action_trace ++ [last_action]->
+  first_CPU_state.(pc) = 0->
+ first_CPU_state.(stack) = []
+         -> 
+         rm_last_two_CPU_trace ++ [last_two_2_CPU_state] =
+     first_CPU_state :: rm_first_last_CPU_trace ->
+     exists
+       (mem_list : list (int256 -> int256)) (first_mem
+                                             last_mem : 
+                                             int256 -> int256),
+       Datatypes.length mem_list = Datatypes.length rm_last_action_trace /\
+       eval_ins_list (inst0 :: program)
+         (combine_to_pc_state first_CPU_state first_mem)
+         (combine_to_act_state_list    (rm_last_two_CPU_trace )  mem_list rm_last_action_trace)
+         (combine_to_pc_state last_two_2_CPU_state last_mem)
+     
+.
+Proof.
+  intros.
+  destruct H as [mem_list[in_list_first_mem [last_mem_list [? ?]]]].
+  inversion H2;clear H2;subst.
+    Search (eval_ins_list).
+    Abort.
+
+Lemma combine_to_act_state_list_app:
+    forall (l1:list CPU_state)( l2:list (int256 -> int256))( l3:list action_type) (x1:CPU_state)(x2:(int256 -> int256))(x3:action_type),length l1 = length l2 -> length l2 = length l3 ->combine_to_act_state_list (l1++[x1])(l2++[x2])(l3++[x3])=
+    combine_to_act_state_list l1 l2 l3 ++ combine_to_act_state_list [x1] [x2] [x3].
+Proof.
+  intros.
+  unfold combine_to_act_state_list.
+  pose proof map_app (fun x : CPU_state * (int256 -> int256) * action_type =>
+   combine_to_act_state (fst (fst x)) (snd (fst x)) (snd x)) (combine (combine l1 l2) l3) (combine (combine [x1] [x2]) [x3]).
+   simpl.
+   Search (combine (?l1) (?l2 ) ++ ?l).
+   pose proof combine_app l1 [x1] l2 [x2] H (ltac:(simpl;tauto)).
+      Search (length (combine ?l1 ?l2)).
+   pose proof len_combine l1 l2 H.
+  rewrite H0 in H3.
+  symmetry in H3.
+  simpl in *.
+  pose proof combine_app (combine l1 l2) [(x1,x2)] l3 [x3] H3 (ltac:(simpl;tauto)).
+  rewrite H2.
+  simpl in H4.
+  rewrite <- H4 in H1.
+  tauto.
+Qed.
+
+Lemma Increasing_timestamp_subst:
+  forall (l:list act_state)(x:act_state),Increasing_timestamp (l++[x])-> Increasing_timestamp l.
+Proof.
+  intros.
+  inversion H.
+  + destruct l.
+    - simpl in H1.
+      discriminate.
+    - simpl in H1.
+      discriminate.
+  + destruct l.
+    - apply ActionListNil.
+    - simpl in H0.
+      inversion H0.
+      destruct l; simpl in H4;discriminate.
+  + pose proof app_inj_tail (l0 ++ [x0]) l y x H0.
+     destruct H3.
+     subst.
+     tauto.
+Qed.
+  

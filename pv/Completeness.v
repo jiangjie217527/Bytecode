@@ -22,7 +22,6 @@ Import CPU_state.
 Import pc_state.
 Import act_state.
 
-
 Theorem completeness_of_protocol:
 forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace:
 list CPU_state)
@@ -108,6 +107,8 @@ Proof.
      (*------改个名字，符合实际--------*)
      rename l into rm_last_two_CPU_trace.
      rename x into last_two_2_CPU_state.
+     pose proof H5.
+     rename H0 into G. (*增援未来*)
      (*--------改完了------*)
      (*----------------------------------把CPU_trace细分-----------------*)
      pose proof cons_eq last_two_2_CPU_state rm_last_two_CPU_trace.
@@ -302,9 +303,163 @@ Proof.
       (*给条件的是最后一个不方便证明，前面按道理都可以证明，所以有没有可能*)
       (*是归纳地证明，第一个可以，然后前一个可以则后一个可以*)
       (*-------------对这第一步的单步化简---------------*)
-      (*-----------------unfold H4------------------------------*)
-      Admitted.
+      (*----由整个程序满足multiset推出除去最后一个也满足multiset---------------------*)
+      pose proof multiset_subst.
+      specialize (H rm_first_last_CPU_trace (inst0 :: rm_first_program) first_CPU_state  last_CPU_state).
+      pose proof H H4. clear H.
+      rewrite <- H0 in H3.
+      pose proof H8 H3. clear H8.
+      assert (length rm_first_mem_list = length rm_last_mem_list).
+      {
+        assert (length (in_list_first_mem :: rm_first_mem_list ) = length ( rm_last_mem_list ++ [in_list_last_mem])).
+        {
+          rewrite H9;tauto.
+          }
+          simpl in H8.
+          pose proof last_length rm_last_mem_list in_list_last_mem.
+          rewrite H17 in H8.
+          inversion H8.
+          tauto.
+       }
+       inversion H4;clear H4;subst.
+       inversion H17;clear H17;subst.
+       rewrite H14 in H16.
+       assert (first_CPU_state.(inst)  = inst0).
+       {
+           inversion H16;clear H16.
+           + inversion H4.
+              symmetry in H16.
+              tauto.
+            + pose proof zero_not_in_seq_one (Datatypes.length rm_first_program).
+              pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) first_CPU_state.(inst) 0 H4.
+              pose proof H15 H16;contradiction.
+       }
+      Print fold_right.
+      
+      
+      inversion H13;clear H13.
+      - subst.
+        clear H16.
+              assert (
+        (exists
+       (mem_list : list (int256 -> int256)) (first_mem
+                                             last_mem : 
+                                             int256 -> int256),
+       Datatypes.length mem_list = Datatypes.length rm_last_action_trace /\
+       eval_ins_list (first_CPU_state.(inst) :: rm_first_program)
+         (combine_to_pc_state first_CPU_state first_mem)
+         (combine_to_act_state_list rm_last_two_CPU_trace mem_list
+            rm_last_action_trace)
+         (combine_to_pc_state last_two_2_CPU_state last_mem))
+      ).
+            {
+        exists (rm_last_mem_list),in_list_first_mem,in_list_last_mem.
+        split.
+        + rewrite H6 in H11.
+           rewrite H8 in H11.
+           rewrite H11.
+           tauto.
+        + assert (     (pc_state.state (combine_to_pc_state first_CPU_state in_list_first_mem)).(memory) =
+(fun _ : int256 => zero)/\program_state.stack
+  (pc_state.state (combine_to_pc_state first_CPU_state in_list_first_mem)) =
+[]).
+          {
+          unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state.
+                      simpl in H15.
+            split;simpl;            destruct first_CPU_state.(inst);inversion H15;clear H15;simpl in *;subst;inversion H13;symmetry in H15;tauto.
+          }
+          destruct H4.
+        apply sigma with (l:= (first_CPU_state.(inst) :: rm_first_program)) (x:=   (combine_to_pc_state first_CPU_state in_list_first_mem)) (y:=   (combine_to_act_state_list rm_last_two_CPU_trace rm_last_mem_list
+     rm_last_action_trace)) (z:=   (combine_to_pc_state last_two_2_CPU_state in_list_last_mem)).
+          - tauto.
+          - tauto.
+          - tauto.
+          - Search (Increasing_timestamp).
+            rewrite H1 in H12.
+            rewrite H9 in H12.
+            pose proof combine_to_act_state_list_app (rm_last_two_CPU_trace)(rm_last_mem_list)  rm_last_action_trace last_two_2_CPU_state in_list_last_mem last_action.
+            assert (length rm_last_two_CPU_trace = length rm_last_mem_list).
+            {
+              rewrite <- H7 in H11.
+              rewrite <- H11 in H8.
+              tauto.
+            }
+            assert (Datatypes.length rm_last_mem_list = Datatypes.length rm_last_action_trace).
+            {
+              rewrite H8 in H11.
+              rewrite H11 in H6.
+              tauto.
+            }
+            pose proof H16 H17 H19;clear H16.
+            rewrite H20 in H12.
+            assert (exists (last:act_state), combine_to_act_state_list [last_two_2_CPU_state]
+           [in_list_last_mem] [last_action] = [last]).
+           {
+            unfold combine_to_act_state_list .
+            simpl.
+            exists (combine_to_act_state last_two_2_CPU_state in_list_last_mem last_action).
+            tauto.
+           }
+            destruct H16.
+            rewrite H16 in H12.
+            pose proof Increasing_timestamp_subst  (combine_to_act_state_list rm_last_two_CPU_trace rm_last_mem_list rm_last_action_trace) x H12.
+            tauto.
+         - simpl.
+            exists n0.
+            Search (nsteps).
+            
+      }
+      - sets_unfold in H15.
+        pose proof eval_ins_same_pc.
+        pose proof out_property.
+        specialize (H17 ins pc_state (list act_state) pc_state).
+        specialize(H17 (combine rm_first_program (seq 1 (Datatypes.length rm_first_program)))).
+        specialize (H17 eval_ins).
+        specialize(H17  ({|          pc_state.pc := 0;          pc_state.state :=            {|              memory := fun _ : int256 => zero; program_state.stack := []            |}        |})  [{|           pc := first_CPU_state.(pc);           state :=             {|               memory := in_list_first_mem;               program_state.stack := first_CPU_state.(stack)             |};           action := first_action         |}] second_pc_state).
+       specialize (H17 rm_first_program (seq 1 (Datatypes.length rm_first_program))).
+       pose proof H17 H13 H15 (ltac:(tauto));clear H17.
+       pose proof seq_length (Datatypes.length rm_first_program) 1.
+       symmetry in H17.
+       pose proof H19 H17;clear H19.
+       destruct H20 as [x [? ?]].
+       destruct x.
+       unfold eval_ins in H19.
+       destruct i;inversion H19;subst;inversion H25;simpl in *.
+       ++  pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) JUMPI 0 H20.
+            pose proof zero_not_in_seq_one (Datatypes.length rm_first_program) H4;contradiction.
+             ++  pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) JUMP 0 H20.
+            pose proof zero_not_in_seq_one (Datatypes.length rm_first_program) H4;contradiction.
+              ++  pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) POP 0 H20.
+            pose proof zero_not_in_seq_one (Datatypes.length rm_first_program) H4;contradiction.
+            ++  pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) ADD 0 H20.
+            pose proof zero_not_in_seq_one (Datatypes.length rm_first_program) H4;contradiction.
+            ++  pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) MUL 0 H20.
+            pose proof zero_not_in_seq_one (Datatypes.length rm_first_program) H4;contradiction.
+            ++  pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) SUB 0 H20.
+            pose proof zero_not_in_seq_one (Datatypes.length rm_first_program) H4;contradiction.
+            ++  pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) MLOAD 0 H20.
+            pose proof zero_not_in_seq_one (Datatypes.length rm_first_program) H4;contradiction.
+            ++  pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) MSTORE 0 H20.
+            pose proof zero_not_in_seq_one (Datatypes.length rm_first_program) H4;contradiction.
+            ++  pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) (PUSH32 v) 0 H20.
+            pose proof zero_not_in_seq_one (Datatypes.length rm_first_program) H4;contradiction.
+            
+            
+            
+            
+            
+            
+            
+            
       (*
+       * admit.
+       *pose proof zero_not_in_seq_one (Datatypes.length rm_first_program).
+              pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) first_CPU_state.(inst) 0 H17.
+              pose proof H20 H21;contradiction.
+       
+
+
+
       inversion H13;clear H13.
       - admit.
      - sets_unfold in H.
@@ -377,5 +532,5 @@ Proof.
       (*要证明单射，就要用到时间戳，所以下面是处理时间戳来证明单射的代码*)
       (*------------------------证明单射(由于太长已经移到Lemma里面了)-----------------------------*)
       
-Admitted.
-*)
+Admitted.*)
+12*)

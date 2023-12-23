@@ -309,6 +309,9 @@ Proof.
       pose proof H H4. clear H.
       rewrite <- H0 in H3.
       pose proof H8 H3. clear H8.
+      (*-------------------证明完毕----------------*)
+      (*接下来尝试证明第一步能运行到倒数第二步*)
+      (*------------------首先要找到第一步到倒数第二步的mem_list和last_mem,也就是原本的倒数第二个mem-----------*)
       assert (length rm_first_mem_list = length rm_last_mem_list).
       {
         assert (length (in_list_first_mem :: rm_first_mem_list ) = length ( rm_last_mem_list ++ [in_list_last_mem])).
@@ -321,6 +324,7 @@ Proof.
           inversion H8.
           tauto.
        }
+       (*-------以上补证了mem_list 除去第一个和除去最后一个长度相同*)
        inversion H4;clear H4;subst.
        inversion H17;clear H17;subst.
        rewrite H14 in H16.
@@ -336,10 +340,11 @@ Proof.
        }
       Print fold_right.
       
-      
+      (*通过H13得到第一步确实符合语意（反面情况已经证好）*)
       inversion H13;clear H13.
       - subst.
         clear H16.
+        (*-------------进入子证明--------------*)
               assert (
         (exists
        (mem_list : list (int256 -> int256)) (first_mem
@@ -353,13 +358,21 @@ Proof.
          (combine_to_pc_state last_two_2_CPU_state last_mem))
       ).
             {
+            (*------------确认从第一步到倒数第二步的mem_list和last mem-------*)
+            (*现在mem_list的表达方式有
+            1. in_list_first_mem :: rm_first_mem_list
+            2.  rm_last_mem_list ++ [in_list_last_mem]
+            其中in_list_first_mem应该就是f(x)=0
+           有一个last_mem,特指最后一步的mem状态*)
         exists (rm_last_mem_list),in_list_first_mem,in_list_last_mem.
         split.
         + rewrite H6 in H11.
            rewrite H8 in H11.
            rewrite H11.
            tauto.
-        + assert (     (pc_state.state (combine_to_pc_state first_CPU_state in_list_first_mem)).(memory) =
+        + (*下面证明最后一个能从第一个运行到倒数第二个所需要的条件*)
+        (*----------这里应该是想确认first_mem是f(x)=0但是有点多余------------*)
+        assert (     (pc_state.state (combine_to_pc_state first_CPU_state in_list_first_mem)).(memory) =
 (fun _ : int256 => zero)/\program_state.stack
   (pc_state.state (combine_to_pc_state first_CPU_state in_list_first_mem)) =
 []).
@@ -370,11 +383,11 @@ Proof.
           }
           destruct H4.
         apply sigma with (l:= (first_CPU_state.(inst) :: rm_first_program)) (x:=   (combine_to_pc_state first_CPU_state in_list_first_mem)) (y:=   (combine_to_act_state_list rm_last_two_CPU_trace rm_last_mem_list
-     rm_last_action_trace)) (z:=   (combine_to_pc_state last_two_2_CPU_state in_list_last_mem)).
+     rm_last_action_trace)) (z:=   (combine_to_pc_state last_two_2_CPU_state in_list_last_mem)). (*分开我们要证的内容*)
           - tauto.
           - tauto.
           - tauto.
-          - Search (Increasing_timestamp).
+          - (*这里证明时间戳确实是递增*)
             rewrite H1 in H12.
             rewrite H9 in H12.
             pose proof combine_to_act_state_list_app (rm_last_two_CPU_trace)(rm_last_mem_list)  rm_last_action_trace last_two_2_CPU_state in_list_last_mem last_action.
@@ -404,8 +417,340 @@ Proof.
             rewrite H16 in H12.
             pose proof Increasing_timestamp_subst  (combine_to_act_state_list rm_last_two_CPU_trace rm_last_mem_list rm_last_action_trace) x H12.
             tauto.
-         - simpl.
+         - (*这里证明通过有限步可以从第一步到倒数第二步*)
+            
+            simpl.
             exists n0.
+            assert (in_list_first_mem = (fun _ : int256 => zero)).
+            {
+              unfold eval_ins in H15.
+              destruct first_CPU_state.(inst);simpl in H4;tauto.
+            }
+            subst.
+            (*分类n是不是0，n为0则倒数第二个就是第一个*)
+            destruct rm_first_last_CPU_trace. 
+            * assert (n0 = 0).
+               {
+                  destruct n0.
+                  + tauto.
+                  + inversion H5;clear H5;subst;simpl in *.
+                     sets_unfold in H16.
+                     destruct H16 as [? [? [? [? ?]]]].
+                     pose proof app_eq_nil x0 x1 H5;clear H5.
+                     destruct H19;subst.
+                     inversion H16;clear H16;subst.
+                     pose proof fold_ins_sem_nil  (combine (first_CPU_state.(inst) :: rm_first_program)
+          (seq 0
+             (Datatypes.length
+                (first_CPU_state.(inst) :: rm_first_program)))) second_pc_state x H5;contradiction.
+                }
+                subst.
+                pose proof app_last_corr rm_last_two_CPU_trace [] last_two_2_CPU_state first_CPU_state H0.
+                destruct H16;subst.
+                simpl.
+                sets_unfold.
+                split.
+                ++       unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state.
+                    simpl.
+                    tauto.
+                ++ inversion H7.
+                      rewrite <- H17 in H11.
+                      pose proof length_zero_iff_nil.
+                      specialize (H16 (int256 -> int256) rm_first_mem_list).
+                      destruct H16.
+                      symmetry in H11.
+                      pose proof H16 H11.
+                      subst.
+                      symmetry in H9.
+                      pose proof app_after_nil_2 rm_last_mem_list in_list_last_mem (fun _ : int256 => zero) H9.
+                      rewrite H20.
+                      tauto.
+            * (*下面处理n不为0，由于实际使用的条件是，first_CPU_state后面接了一个c*)
+               (*所以要分，一个是倒数第二个是c,一个是倒数第二个在rm_first_CPU_trace里面*)
+              assert (exists (rm_first_last_two_CPU_trace:list CPU_state),first_CPU_state ::rm_first_last_two_CPU_trace = rm_last_two_CPU_trace).
+              {
+                destruct rm_first_last_CPU_trace.
+                + exists [].
+                Print two_ele_app.
+                    pose proof two_ele_app first_CPU_state c.
+                    rewrite H16 in H0.
+                    Search (?l ++[?x] = ?l' ++[?y]).
+                    pose proof app_inj_tail rm_last_two_CPU_trace [first_CPU_state]  last_two_2_CPU_state c H0.
+                    destruct H17.
+                    symmetry in H17;tauto.
+                  + pose proof cons_app_eq c0 rm_first_last_CPU_trace.
+                     destruct H16 as [? [? ?]].
+                     exists (c::x0).
+                     rewrite H16 in H0.
+                    pose proof app_inj_tail rm_last_two_CPU_trace (first_CPU_state :: c :: x0)  last_two_2_CPU_state x H0.
+                    destruct H17.
+                    symmetry in H17;tauto.
+              }
+              destruct H16 as [? ?].
+              subst.
+              rename x into rm_first_last_two_CPU_trace.
+              (*-------------以上说明了现在至少有3个，除去最后两个，还能在前面找到c
+              现在CPU_trace的表示方式有
+              1. first_CPU_state :: rm_first_last_two_CPU_trace++
+     [last_two_2_CPU_state] ++[last_CPU_state] 
+              2. first_CPU_state :: c :: rm_first_last_CPU_trace ++[last_CPU_state] 
+              由于分类讨论，rm_first_last_CPU_trace 现在其实是rm_first_two_last_CPU_trace*)
+              simpl in H7.
+              pose proof H11.
+              rewrite <- H7 in H16.
+              pose proof len_succ rm_first_mem_list (Datatypes.length rm_first_last_two_CPU_trace) H16.
+              destruct H17 as [second_m [rm_first_two_memo ?]].
+              pose proof len_succ rm_first_action_trace (Datatypes.length rm_first_last_two_CPU_trace) H7.
+              destruct H19 as [second_action [rm_first_two_action ?]].
+              subst.
+              (*---现在action也有两种不一样的表示方式
+              1. first_action :: second_action :: rm_first_two_action
+              2. rm_last_action_trace ++ [last_action]*)
+              assert (exists (n1:nat), S n1 = n0).
+              {
+                destruct n0.
+                + inversion H5.
+                   sets_unfold in H17;simpl in H17.
+                   inversion H17.
+                + exists n0;tauto.
+              }
+              destruct H17 as [n1 ?];subst.
+              inversion H0.
+              (*以上验证了n不为0*)
+              rewrite <- H19 in H5.
+              pose proof cons_app_eq second_m rm_first_two_memo.
+              pose proof cons_app_eq second_action rm_first_two_action.
+              destruct H17 as [last_two_m [rm_last_two_m ?] ].
+              destruct H20 as [last_two_a [rm_first_last_two_a ?] ].
+              rewrite H17 in H5.
+              rewrite H20 in H5.
+              subst.
+              clear H4 H13 H18.
+              assert (nsteps (eval_ins_list_single (first_CPU_state.(inst) :: rm_first_program)) 1 {|
+          pc_state.pc := 0;
+          pc_state.state :=
+            {|
+              memory := fun _ : int256 => zero; program_state.stack := []
+            |}
+        |} [{|
+           pc := first_CPU_state.(pc);
+           state :=
+             {|
+               memory := fun _ : int256 => zero;
+               program_state.stack := first_CPU_state.(stack)
+             |};
+           action := first_action
+         |}]  second_pc_state).
+         {
+            simpl.
+            sets_unfold.
+            exists second_pc_state,[{|
+     pc := first_CPU_state.(pc);
+     state :=
+       {|
+         memory := fun _ : int256 => zero;
+         program_state.stack := first_CPU_state.(stack)
+       |};
+     action := first_action
+   |}],[] .
+              split.
+              + tauto.
+              + split.
+                 - apply Definition_and_soundness.one with (l:= ( (first_CPU_state.(inst) :: rm_first_program))) (y:= [{|
+     pc := first_CPU_state.(pc);
+     state :=
+       {|
+         memory := fun _ : int256 => zero;
+         program_state.stack := first_CPU_state.(stack)
+       |};
+     action := first_action
+   |}]) (x:= {|
+    pc_state.pc := 0;
+    pc_state.state :=
+      {| memory := fun _ : int256 => zero; program_state.stack := [] |}
+  |}) (z:= second_pc_state).
+  unfold fold_ins_sem.
+     simpl.
+     simpl in H15.
+     sets_unfold.
+     left.
+     tauto.
+     - split;tauto.
+         }
+        Check nsteps_n_m.
+        pose proof nsteps_n_m (eval_ins_list_single (first_CPU_state.(inst) :: rm_first_program)) 1 (S n1).
+        simpl in H13.
+        sets_unfold in H13.
+        simpl in H13.
+        remember (eval_ins_list_single
+                 (first_CPU_state.(inst) :: rm_first_program)) as f.
+              
+                 (*------这里特化了一个nsteps的性质*)
+        specialize (H13 {|
+          pc_state.pc := 0;
+          pc_state.state :=
+            {|
+              memory := fun _ : int256 => zero; program_state.stack := []
+            |}
+        |} ([{|
+          pc := first_CPU_state.(pc);
+          state := 
+            {|
+              memory := fun _ : int256 => zero;
+              program_state.stack := first_CPU_state.(stack)
+            |};
+          action := first_action
+        |}]++(map
+          (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {|
+             pc := (fst (fst x)).(pc);
+             state :=
+               {|
+                 memory := snd (fst x);
+                 program_state.stack := (fst (fst x)).(stack)
+               |};
+             action := snd x
+           |})
+          (combine
+             (combine
+                (rm_first_last_two_CPU_trace ++ [last_two_2_CPU_state])
+                (rm_last_two_m ++ [last_two_m]))
+             (rm_first_last_two_a ++ [last_two_a])))) {|
+         pc_state.pc := last_CPU_state.(pc);
+         pc_state.state :=
+           {|
+             memory := last_mem;
+             program_state.stack := last_CPU_state.(stack)
+           |}
+       |} ).
+       destruct H13.
+       clear H13.
+       assert ((exists (i : pc_state) (i0 i1 : list act_state),
+         i0 ++ i1 =
+         [{|
+            pc := first_CPU_state.(pc);
+            state :=
+              {|
+                memory := fun _ : int256 => zero;
+                program_state.stack := first_CPU_state.(stack)
+              |};
+            action := first_action
+          |}] ++
+         map
+           (fun x : CPU_state * (int256 -> int256) * action_type =>
+            {|
+              pc := (fst (fst x)).(pc);
+              state :=
+                {|
+                  memory := snd (fst x);
+                  program_state.stack := (fst (fst x)).(stack)
+                |};
+              action := snd x
+            |})
+           (combine
+              (combine
+                 (rm_first_last_two_CPU_trace ++ [last_two_2_CPU_state])
+                 (rm_last_two_m ++ [last_two_m]))
+              (rm_first_last_two_a ++ [last_two_a])) /\
+         f
+           {|
+             pc_state.pc := 0;
+             pc_state.state :=
+               {|
+                 memory := fun _ : int256 => zero;
+                 program_state.stack := []
+               |}
+           |} i0 i /\
+         (exists (i2 : pc_state) (i3 i4 : list act_state),
+            i3 ++ i4 = i1 /\
+            f i i3 i2 /\
+            nsteps f n1 i2 i4
+              {|
+                pc_state.pc := last_CPU_state.(pc);
+                pc_state.state :=
+                  {|
+                    memory := last_mem;
+                    program_state.stack := last_CPU_state.(stack)
+                  |}
+              |}))).
+           {
+              exists second_pc_state.
+              exists  [{|
+     pc := first_CPU_state.(pc);
+     state :=
+       {|
+         memory := fun _ : int256 => zero;
+         program_state.stack := first_CPU_state.(stack)
+       |};
+     action := first_action
+   |}].     exists (map
+    (fun x : CPU_state * (int256 -> int256) * action_type =>
+     {|
+       pc := (fst (fst x)).(pc);
+       state :=
+         {|
+           memory := snd (fst x);
+           program_state.stack := (fst (fst x)).(stack)
+         |};
+       action := snd x
+     |})
+    (combine
+       (combine (rm_first_last_two_CPU_trace ++ [last_two_2_CPU_state])
+          (rm_last_two_m ++ [last_two_m]))
+       (rm_first_last_two_a ++ [last_two_a]))).
+       split.
+       + tauto.
+       + split.
+          - rewrite Heqf.
+            simpl.
+            apply Definition_and_soundness.one with (l:= ( (first_CPU_state.(inst) :: rm_first_program))) (y:= [{|
+     pc := first_CPU_state.(pc);
+     state :=
+       {|
+         memory := fun _ : int256 => zero;
+         program_state.stack := first_CPU_state.(stack)
+       |};
+     action := first_action
+   |}]) (x:= {|
+    pc_state.pc := 0;
+    pc_state.state :=
+      {| memory := fun _ : int256 => zero; program_state.stack := [] |}
+  |}) (z:= second_pc_state).
+  unfold fold_ins_sem.
+  simpl .
+  sets_unfold.
+       simpl in H15.
+       left.
+       tauto.
+       - 
+       Admitted.
+       (*
+           }
+              (*这里更改了mem和action的表达方式
+              现在是
+              mem:
+               1. (fun _ : int256 => zero) :: second_m :: rm_first_two_memo
+               2. rm_last_mem_list ++ [in_list_last_mem]
+               3. (fun _ : int256 => zero) ++ rm_last_two_m ++ [last_two_m]
+             action:
+              1.  first_action :: second_action :: rm_first_two_action
+              2.  rm_last_action_trace ++ [last_action]
+              3. first_action :: rm_first_last_two_a ++ [last_two_a]
+              *)
+              assert (nsteps (eval_ins_list_single (first_CPU_state.(inst) :: rm_first_program)) 1 (combine_to_pc_state last_two_2_CPU_state rm_last_two_m )
+              (combine_to_act_state_list [last_CPU_state] [last_mem] [last_two_a]) )
+                     (*
+               }
+            assert (nsteps
+       (eval_ins_list_single (first_CPU_state.(inst) :: rm_first_program)) 1 first_CPU_state [{|
+           pc := first_CPU_state.(pc);
+           state :=
+             {|
+               memory := fun _ : int256 => zero;
+               program_state.stack := first_CPU_state.(stack)
+             |};
+           action := first_action
+         |}] )
             Search (nsteps).
             
       }
@@ -451,86 +796,5 @@ Proof.
             
             
             
-      (*
-       * admit.
-       *pose proof zero_not_in_seq_one (Datatypes.length rm_first_program).
-              pose proof in_combine_r rm_first_program (seq 1 (Datatypes.length rm_first_program)) first_CPU_state.(inst) 0 H17.
-              pose proof H20 H21;contradiction.
-       
 
-
-
-      inversion H13;clear H13.
-      - admit.
-     - sets_unfold in H.
-       try contradiction.
-       Check eval_ins_same_pc.
-       pose proof eval_ins_same_pc.
-       Check out_property.
-      assert(exists (inst0':ins),eval_ins (inst0', 0)
-        {|
-          pc_state.pc := 0;
-          pc_state.state :=
-            {|
-              memory := fun _ : int256 => zero; program_state.stack := []
-            |}
-        |} [first_act] second_pc_state).
-        {admit.
-        (*
-           revert 
-           
-           + simpl in H3;contradiction.
-           + simpl in H3;destruct H3.
-              - destruct a;inversion H3;simpl in H17;discriminate.
-              - 
-           inversion H12;clear H12.
-           + rewrite H0 in H16.
-              inversion H16.
-           + rewrite H0 in H15.
-              inversion H15;clear H15.
-              unfold combine_to_act_state,Definition_and_soundness.Build_program_state in H17.
-              inversion H17;clear H17;subst. 
-              simpl in H16.
-              pose proof map_nil (fun x : CPU_state * (int256 -> int256) * action_type =>
-         combine_to_act_state (fst (fst x)) (snd (fst x)) (snd x))
-        (combine (combine rm_first_last_CPU_trace rm_first_mem_list)
-           rm_first_action_trace) H18;clear H18.
-              rewrite H12 in H.
-              simpl in H.
-              destruct first_act_trace.
-              - simpl in H3.
-              admit.*)
-        }
-      
-      
-      pose proof out_property (inst0,0) (combine rm_first_program(seq 1 (Datatypes.length rm_first_program))) eval_ins ({|
-         pc_state.pc := 0;
-         pc_state.state :=
-           {|
-             memory := fun _ : int256 => zero; program_state.stack := []
-           |}
-       |}) [first_act] second_pc_state inst0 0 rm_first_program (seq 1 (Datatypes.length rm_first_program)) H3 H.
-       
-    assert (eval_ins (inst0, 0)
-        {|
-          pc_state.pc := 0;
-          pc_state.state :=
-            {|
-              memory := fun _ : int256 => zero; program_state.stack := []
-            |}
-        |} first_act_trace second_pc_state).
-        {
-          unfold eval_ins.
-          destruct inst0.
-          + tauto.
-          }
-           Check  
-             (seq 1 (Datatypes.length rm_first_prgram)).
-             Check fold_right.
-             Print In.
-      (*要想使用H13，就需要证明eval_ins是单射（见Out_property）*)
-      (*要证明单射，就要用到时间戳，所以下面是处理时间戳来证明单射的代码*)
-      (*------------------------证明单射(由于太长已经移到Lemma里面了)-----------------------------*)
-      
-Admitted.*)
-12*)
+Admitted.*)*)

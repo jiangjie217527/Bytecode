@@ -720,4 +720,534 @@ Proof.
      subst.
      tauto.
 Qed.
+
+Lemma fold_ins_sem_nil:
+  forall (l:list (ins*nat))(s1 s3:pc_state),
+  fold_ins_sem l s1 [] s3 -> False.
+Proof.
+  intros l.
+  induction l.
+  + intros.
+      inversion H;clear H.
+   + intros.
+      inversion H;clear H.
+      - unfold eval_ins in H0.
+      destruct a.
+        destruct i;inversion H0.
+      - specialize (IHl s1 s3).
+        pose proof IHl H0.
+        tauto.
+Qed.
+
+Lemma fold_right_s1:
+   forall (p:list ins) (s1 s3:pc_state) (c:CPU_state) (m: (int256 -> int256)) (a:action_type)(n:nat), fold_right Sets.union ∅ (map eval_ins (combine p (seq n (Datatypes.length p))))s1 [{|
+          pc := c.(pc);
+          state :=
+            {| memory := m; program_state.stack := c.(stack) |};
+          action := a
+        |}] s3 ->s1 =
+{|
+  pc_state.pc := c.(pc);
+  pc_state.state :=
+    {| memory := m; program_state.stack := c.(stack) |}
+|}.
+Proof.
+   intros p.
+   induction p.
+   + intros.
+       unfold  fold_right in H.
+       simpl in H.
+       sets_unfold in H.
+       contradiction.
+    + intros.
+       unfold  fold_right in H.
+       simpl in H.
+       sets_unfold in H.
+      destruct a.
+      - destruct H.
+        * inversion H;clear H;subst; simpl in *.
+           destruct s1;simpl in *.
+           rewrite H4.
+           rewrite H1.
+           tauto.
+        * specialize (IHp s1 s3 c m a0 (S n)). 
+           unfold  fold_right in IHp.
+           pose proof IHp H.
+           tauto.
+      - destruct H.
+        * inversion H;clear H;subst; simpl in *.
+           destruct s1;simpl in *.
+           rewrite H4.
+           rewrite H1.
+           tauto.
+        * specialize (IHp s1 s3 c m a0 (S n)). 
+           unfold  fold_right in IHp.
+           pose proof IHp H.
+           tauto.
+      - destruct H.
+        * inversion H;clear H;subst; simpl in *.
+           destruct s1;simpl in *.
+           rewrite H4.
+           rewrite H1.
+           tauto.
+        * specialize (IHp s1 s3 c m a0 (S n)). 
+           unfold  fold_right in IHp.
+           pose proof IHp H.
+           tauto.
+      - destruct H.
+        * inversion H;clear H;subst; simpl in *.
+           destruct s1;simpl in *.
+           rewrite H4.
+           rewrite H1.
+           tauto.
+        * specialize (IHp s1 s3 c m a0 (S n)). 
+           unfold  fold_right in IHp.
+           pose proof IHp H.
+           tauto.
+      - destruct H.
+        * inversion H;clear H;subst; simpl in *.
+           destruct s1;simpl in *.
+           rewrite H4.
+           rewrite H1.
+           tauto.
+        * specialize (IHp s1 s3 c m a0 (S n)). 
+           unfold  fold_right in IHp.
+           pose proof IHp H.
+           tauto.
+      - destruct H.
+        * inversion H;clear H;subst; simpl in *.
+           destruct s1;simpl in *.
+           rewrite H4.
+           rewrite H1.
+           tauto.
+        * specialize (IHp s1 s3 c m a0 (S n)). 
+           unfold  fold_right in IHp.
+           pose proof IHp H.
+           tauto.
+      - destruct H.
+        * inversion H;clear H;subst; simpl in *.
+           destruct s1;simpl in *.
+           rewrite H3.
+           rewrite H1.
+           tauto.
+        * specialize (IHp s1 s3 c m a0 (S n)). 
+           unfold  fold_right in IHp.
+           pose proof IHp H.
+           tauto.
+      - destruct H.
+        * inversion H;clear H;subst; simpl in *.
+           destruct s1;simpl in *.
+           rewrite H3.
+           rewrite H1.
+           tauto.
+        * specialize (IHp s1 s3 c m a0 (S n)). 
+           unfold  fold_right in IHp.
+           pose proof IHp H.
+           tauto.
+      - destruct H.
+        * inversion H;clear H;subst; simpl in *.
+           destruct s1;simpl in *.
+           rewrite H4.
+           rewrite H1.
+           tauto.
+        * specialize (IHp s1 s3 c m a0 (S n)). 
+           unfold  fold_right in IHp.
+           pose proof IHp H.
+           tauto.
+Qed.
+
+Lemma nsteps_one:
+  forall (p:list ins) (s1 s3:pc_state) (rm_last_CPU_trace:list CPU_state)(last_C:CPU_state) (rm_last_m:list (int256->int256))(last_m:(int256->int256))(rm_last_a:list action_type) (last_a:action_type), nsteps (eval_ins_list_single p) 1 s1 (map
+          (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {|
+             pc := (fst (fst x)).(pc);
+             state :=
+               {|
+                 memory := snd (fst x);
+                 program_state.stack := (fst (fst x)).(stack)
+               |};
+             action := snd x
+           |}) (combine (combine (rm_last_CPU_trace++[last_C])(rm_last_m++[last_m]) ) (rm_last_a++[last_a]))) s3 -> 
+           length rm_last_a = length rm_last_m->
+           length rm_last_CPU_trace = length rm_last_m->
+           nsteps (eval_ins_list_single p) 0 s1 (map
+          (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {|
+             pc := (fst (fst x)).(pc);
+             state :=
+               {|
+                 memory := snd (fst x);
+                 program_state.stack := (fst (fst x)).(stack)
+               |};
+             action := snd x
+           |}) (combine (combine (rm_last_CPU_trace)(rm_last_m))  (rm_last_a)))
+           (combine_to_pc_state last_C last_m)
+           .
+Proof.
+  (*intros p n.
+  revert p.
+  destruct n.
+  +*) intros.
+      inversion H;clear H.
+      simpl in H2.
+      sets_unfold in H2.
+      simpl.
+      sets_unfold.
+      destruct H2 as [? [? [? [? [? ?]]]]].
+      subst.
+      inversion H2;clear H2.
+      subst.
+      unfold fold_ins_sem in H3.
+      Check one_step_generate_one_action.
+      pose proof one_step_generate_one_action s1 s3 x0 p 0 H3.
+      pose proof app_nil_r x0.
+      rewrite H4 in H.
+      rewrite H in H2.
+      pose proof map_length   (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {|
+             pc := (fst (fst x)).(pc);
+             state :=
+               {|
+                 memory := snd (fst x);
+                 program_state.stack := (fst (fst x)).(stack)
+               |};
+             action := snd x
+           |})  (combine
+             (combine (rm_last_CPU_trace ++ [last_C]) (rm_last_m ++ [last_m]))
+             (rm_last_a ++ [last_a])).
+       rewrite H2 in H5.
+       Check combine_app.
+       pose proof combine_app rm_last_CPU_trace [last_C] rm_last_m [last_m] H1 (ltac:(tauto)).
+       pose proof len_combine rm_last_CPU_trace rm_last_m H1.
+       rewrite H6 in H2.
+       simpl in H2.
+       pose proof combine_app (combine rm_last_CPU_trace rm_last_m) [(last_C, last_m)] rm_last_a [last_a].
+        rewrite <- H0 in H7.
+       symmetry in H7.
+       pose proof H8 H7 (ltac:(tauto)).
+       rewrite H9 in H2.
+       simpl in *.
+      Search (length ?l = 1).
+      pose proof length_one_iff_single (map
+          (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {|
+             pc := (fst (fst x)).(pc);
+             state :=
+               {|
+                 memory := snd (fst x);
+                 program_state.stack := (fst (fst x)).(stack)
+               |};
+             action := snd x
+           |})
+          (combine (combine rm_last_CPU_trace rm_last_m) rm_last_a ++
+           [(last_C, last_m, last_a)])).
+      destruct H10.
+      clear H11.
+      pose proof H10 H2.
+      destruct H11.
+      Search (map ?f (?x++?y)).
+      pose proof map_app (fun x : CPU_state * (int256 -> int256) * action_type =>
+         {|
+           pc := (fst (fst x)).(pc);
+           state :=
+             {|
+               memory := snd (fst x);
+               program_state.stack := (fst (fst x)).(stack)
+             |};
+           action := snd x
+         |}) (combine (combine rm_last_CPU_trace rm_last_m) rm_last_a) [(last_C, last_m, last_a)].
+         rewrite H12 in H11.
+         simpl in H11.
+      pose proof app_after_nil_1 (map (fun x : CPU_state * (int256 -> int256) * action_type =>
+         {|
+           pc := (fst (fst x)).(pc);
+           state :=
+             {|
+               memory := snd (fst x);
+               program_state.stack := (fst (fst x)).(stack)
+             |};
+           action := snd x
+         |})
+        (combine (combine rm_last_CPU_trace rm_last_m) rm_last_a)) 
+        {|
+         pc := last_C.(pc);
+         state :=
+           {| memory := last_m; program_state.stack := last_C.(stack) |};
+         action := last_a
+       |} x H11.
+       clear H4 H5.
+       rewrite H13 in H11.
+       inversion H11;clear H11 H10 H8.
+       Search (map ?f ?l = []).
+       pose proof map_eq_nil  (fun x : CPU_state * (int256 -> int256) * action_type =>
+         {|
+           pc := (fst (fst x)).(pc);
+           state :=
+             {|
+               memory := snd (fst x);
+               program_state.stack := (fst (fst x)).(stack)
+             |};
+           action := snd x
+         |}) (combine (combine rm_last_CPU_trace rm_last_m) rm_last_a) H13.
+       clear H2.
+       rewrite H6 in H.
+       rewrite H9 in H.
+       rewrite H12 in H.
+       rewrite H13 in H.
+       simpl in H.
+       subst.
+       split.
+       - tauto.
+       -      unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state.
+       unfold fold_right in H3.
+       pose proof fold_right_s1 p s1 s3 last_C last_m last_a 0.
+       unfold fold_right in H.
+       pose proof H H3.
+       tauto.
+Qed.
   
+Lemma nsteps_3:
+  forall (n:nat) (p:list ins) (s1 s3:pc_state) (rm_last_CPU_trace:list CPU_state)(last_C:CPU_state) (rm_last_m:list (int256->int256))(last_m:(int256->int256))(rm_last_a:list action_type) (last_a:action_type), nsteps (eval_ins_list_single p) (S n) s1 (map
+          (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {|
+             pc := (fst (fst x)).(pc);
+             state :=
+               {|
+                 memory := snd (fst x);
+                 program_state.stack := (fst (fst x)).(stack)
+               |};
+             action := snd x
+           |}) (combine (combine (rm_last_CPU_trace++[last_C])(rm_last_m++[last_m]) ) (rm_last_a++[last_a]))) s3 -> 
+           length rm_last_a = length rm_last_m->
+           length rm_last_CPU_trace = length rm_last_m->
+           nsteps (eval_ins_list_single p) n s1 (map
+          (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {|
+             pc := (fst (fst x)).(pc);
+             state :=
+               {|
+                 memory := snd (fst x);
+                 program_state.stack := (fst (fst x)).(stack)
+               |};
+             action := snd x
+           |}) (combine (combine (rm_last_CPU_trace)(rm_last_m))  (rm_last_a)))
+           (combine_to_pc_state last_C last_m)
+           .
+Proof.
+  intros n.
+  induction n.
+  + intros.
+     pose proof nsteps_one
+p 
+s1 s3 
+rm_last_CPU_trace 
+last_C 
+rm_last_m  
+last_m  
+rm_last_a  
+last_a H H0 H1. tauto.
+  + intros.
+     inversion H;clear H.
+     simpl in H2;sets_unfold in H2.
+     destruct H2 as [? [? [? [? [? [? [? [? [? ?]]]]]]]]].
+     subst.
+     remember (fun x : CPU_state * (int256 -> int256) * action_type =>
+       {|
+         pc := (fst (fst x)).(pc);
+         state :=
+           {|
+             memory := snd (fst x);
+             program_state.stack := (fst (fst x)).(stack)
+           |};
+         action := snd x
+       |}) as f.
+Abort.
+Lemma nsteps_last_2:
+  forall (p:list ins)(n:nat) (s1 s3:pc_state) (rm_last_two_CPU_trace:list CPU_state)(last_C last_two_C:CPU_state) (rm_last_two_m:list (int256->int256))(last_m last_two_m:(int256->int256))(rm_last_two_a:list action_type) (last_a last_two_a:action_type), nsteps (eval_ins_list_single p) (S n) s1 (map
+          (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {|
+             pc := (fst (fst x)).(pc);
+             state :=
+               {|
+                 memory := snd (fst x);
+                 program_state.stack := (fst (fst x)).(stack)
+               |};
+             action := snd x
+           |}) (combine (combine (rm_last_two_CPU_trace++[last_two_C;last_C])(rm_last_two_m++[last_two_m;last_m]) ) (rm_last_two_a++[last_two_a;last_a]))) s3 -> 
+           length rm_last_two_a = length rm_last_two_m->
+           length rm_last_two_CPU_trace = length rm_last_two_m->
+           nsteps (eval_ins_list_single p) 1 (combine_to_pc_state last_two_C last_two_m ) (map
+          (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {|
+             pc := (fst (fst x)).(pc);
+             state :=
+               {|
+                 memory := snd (fst x);
+                 program_state.stack := (fst (fst x)).(stack)
+               |};
+             action := snd x
+           |}) (combine
+            (combine ([last_C])
+               ( [last_m])) ( [last_a]))) s3.
+Proof.
+  intros p n.
+  revert p.
+  induction n.
+  + intros.
+      admit.
+   + intros.
+   
+Abort.
+Lemma nsteps_last:
+  forall (p:list ins)(n:nat) (s1 s3:pc_state) (rm_last_CPU_trace:list CPU_state)(last_C:CPU_state) (rm_last_m:list (int256->int256))(last_m:(int256->int256))(rm_last_a:list action_type) (last_a:action_type), nsteps (eval_ins_list_single p) (S n) s1 (map
+          (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {|
+             pc := (fst (fst x)).(pc);
+             state :=
+               {|
+                 memory := snd (fst x);
+                 program_state.stack := (fst (fst x)).(stack)
+               |};
+             action := snd x
+           |}) (combine (combine (rm_last_CPU_trace++[last_C])(rm_last_m++[last_m]) ) (rm_last_a++[last_a]))) s3 -> 
+           length rm_last_a = length rm_last_m->
+           length rm_last_CPU_trace = length rm_last_m->
+           nsteps (eval_ins_list_single p) n s1 (map
+          (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {|
+             pc := (fst (fst x)).(pc);
+             state :=
+               {|
+                 memory := snd (fst x);
+                 program_state.stack := (fst (fst x)).(stack)
+               |};
+             action := snd x
+           |}) (combine (combine (rm_last_CPU_trace)(rm_last_m))  (rm_last_a)))
+           (combine_to_pc_state last_C last_m)
+           .
+Proof.
+    intros.
+    destruct rm_last_CPU_trace.
+   + simpl in H1.
+      pose proof length_zero_iff_nil rm_last_m.
+      destruct H2.
+      clear H3.
+      pose proof H2 (ltac:(symmetry in H1;tauto)).
+      clear H2.
+      rewrite <- H1 in H0.
+      pose proof length_zero_iff_nil rm_last_a.
+      destruct H2.
+      clear H4.
+      pose proof H2 H0.
+      subst.
+      simpl in H.
+      sets_unfold in H.
+      clear H1 H2 H0.
+      destruct H as [? [? [? [? [? ?]]]]].
+      inversion H0;clear H0;subst.
+      unfold fold_ins_sem in H2.
+      Check one_step_generate_one_action.
+      pose proof one_step_generate_one_action s1 x x0 p 0 H2.
+       assert (length (x0 ++ x1) = length ([{|
+       pc := last_C.(pc);
+       state := {| memory := last_m; program_state.stack := last_C.(stack) |};
+       action := last_a
+     |}])).
+     {
+          rewrite H.
+          tauto.
+      }
+         simpl in H3.
+         Search (length (?l ++?l')).
+         pose proof app_length x0 x1.
+         rewrite H4 in H3.
+         rewrite H0 in H3.
+         inversion H3;clear H3.
+         Search (length ?l=0).
+         pose proof length_zero_iff_nil x1.
+         destruct H3;clear H5.
+         pose proof H3 H6;clear H3 H6.
+         subst.
+         assert (n=0).
+         {
+            destruct n.
+            + tauto.
+            + simpl in H1.
+                sets_unfold in H1.
+               destruct H1 as [? [? [? [? [? ?]]]]].
+               inversion H3;clear H3;subst.
+               unfold fold_ins_sem in H6.
+                pose proof one_step_generate_one_action x x1 x2 p 0 H6.
+                assert(length (x2++x3)=0).
+                {
+                  rewrite H1.
+                  tauto.
+                }
+                pose proof app_length x2 x3.
+                rewrite H8 in H7.
+                rewrite H3 in H7.
+                discriminate.
+         }
+         subst.
+        simpl.
+        sets_unfold.
+        split.
+        - tauto.
+        - 
+        pose proof app_nil_r x0 .
+        rewrite H3 in H.
+        subst.
+        pose proof fold_right_s1
+        p s1 x last_C  last_m last_a 0 H2.
+        unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state.
+        tauto.
+     + pose proof cons_app_eq c rm_last_CPU_trace. 
+        destruct H2 as [last_two_CPU [rm_first_last_CPU_trace ?]].
+        assert (exists (last_two_m:(int256->int256))(last_two_a:action_type)(rm_first_last_m:list (int256->int256))(rm_first_last_a:list action_type), rm_last_m = rm_first_last_m++[last_two_m]/\rm_last_a = rm_first_last_a++[last_two_a]).
+        { 
+        admit.
+        }
+        destruct H3 as [? [? [? [? [? ?]]]]].
+        subst.
+        rewrite H2 in H.
+        assert(nsteps (eval_ins_list_single p) 1 (combine_to_pc_state last_two_CPU x)  (map
+         (fun x : CPU_state * (int256 -> int256) * action_type =>
+          {|
+            pc := (fst (fst x)).(pc);
+            state :=
+              {|
+                memory := snd (fst x);
+                program_state.stack := (fst (fst x)).(stack)
+              |};
+            action := snd x
+          |}) (combine
+            (combine ([last_C])
+               ( [last_m])) ( [last_a]))) s3).
+        {
+           simpl.
+           sets_unfold.
+           Search nsteps.
+           inversion H;clear H.
+           simpl in H3;sets_unfold in H3.
+          destruct H3 as [? [? [? [? ?]]]].
+          exists s3,[{|
+     pc := last_C.(pc);
+     state := {| memory := last_m; program_state.stack := last_C.(stack) |};
+     action := last_a
+   |}],[].
+          split.
+          + tauto.
+          + split.
+             - inversion H3;clear H3;subst.
+                unfold fold_ins_sem in H5.
+                Check one_step_generate_one_action.
+             pose proof one_step_generate_one_action s1 x3 x4 p 0 H5.
+             Abort.
+        }
+
+   
+   
+   
+   
+   
+      

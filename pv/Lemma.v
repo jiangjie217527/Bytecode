@@ -20,6 +20,44 @@ Import program_state.
 Import CPU_state.
 Import pc_state.
 Import act_state.
+(*-----这不一定成立-------*)
+Lemma map_same:
+  forall [A B:Type] (f:A->B) (l l':list A),
+  map f l = map f l' -> l = l'.
+Proof.
+  intros.
+  induction l.
+  + pose proof map_eq_nil f l'.
+      simpl in H.
+      pose proof H0 (ltac:(symmetry in H;tauto)).
+      symmetry in H1.
+      tauto.
+   + simpl in H.
+      destruct l'.
+      - simpl in H.
+        discriminate.
+      - simpl in H.
+      inversion H.
+      simpl in H1.
+  Search (map ?f ?l).
+Abort.
+
+Lemma cons_app_length:
+  forall [A:Type] (l l':list A)(x y :A),
+  x::l = l'++[y] -> length l = length l'.
+Proof.
+  intros.
+  assert (length (x :: l ) = length (l' ++ [y])).
+  { 
+    rewrite H.
+    tauto.
+  }
+  simpl in H0.
+    pose proof last_length l' y.
+    rewrite H1 in H0.
+    inversion H0.
+    tauto.
+Qed.
 
 Lemma cons_eq: forall {A : Type} (x : A) (l : list A), exists y l',  l ++ [x] = y:: l'.
 Proof.
@@ -1005,7 +1043,28 @@ Proof.
        pose proof H H3.
        tauto.
 Qed.
-  
+
+Lemma combine_3:
+  forall (rm_last_CPU_trace:list CPU_state)(last_C:CPU_state) (rm_last_m:list (int256->int256))(last_m:(int256->int256))(rm_last_a:list action_type) (last_a:action_type),
+   length rm_last_a = length rm_last_m->
+           length rm_last_CPU_trace = length rm_last_m->
+  combine
+       (combine (rm_last_CPU_trace ++ [last_C])( rm_last_m ++[ last_m])) (rm_last_a ++ [last_a]) =
+     combine (combine rm_last_CPU_trace rm_last_m) rm_last_a ++
+     [(last_C, last_m, last_a)].
+Proof.
+  intros.
+  pose proof combine_app rm_last_CPU_trace [last_C] rm_last_m [last_m] H0 (ltac:(tauto)).
+  simpl in *.
+  pose proof len_combine rm_last_CPU_trace rm_last_m H0.
+       rewrite H2 in H.
+       pose proof combine_app (combine rm_last_CPU_trace rm_last_m) [(last_C, last_m)] rm_last_a [last_a] (ltac:(symmetry in H;tauto)) (ltac:(tauto)).
+       simpl in *.
+       rewrite H1.
+       tauto.
+Qed.
+         
+
 Lemma nsteps_3:
   forall (n:nat) (p:list ins) (s1 s3:pc_state) (rm_last_CPU_trace:list CPU_state)(last_C:CPU_state) (rm_last_m:list (int256->int256))(last_m:(int256->int256))(rm_last_a:list action_type) (last_a:action_type), nsteps (eval_ins_list_single p) (S n) s1 (map
           (fun x : CPU_state * (int256 -> int256) * action_type =>
@@ -1245,9 +1304,22 @@ Proof.
              Abort.
         }
 
-   
-   
-   
-   
+Lemma fold_right:
+  forall (p:list ins) (x z:pc_state) (y:act_state) (n:nat),
+  fold_right (fun (x y : pc_state -> list act_state -> pc_state -> Prop) (a : pc_state) (a0 : list act_state) (a1 : pc_state) => x a a0 a1 \/ y a a0 a1)
+        (fun (_ : pc_state) (_ : list act_state) (_ : pc_state) => False) (map eval_ins (combine p (seq n (Datatypes.length (p))))) x [y] z-> x.(pc) = y.(pc)/\x.(state) = y.(state).
+Proof.
+  intros p.
+  induction p.
+  + intros.
+   inversion H.
+  + intros.
+   simpl in H.
+      destruct H.
+      - destruct a ;destruct x; inversion H;simpl in H;subst;simpl in *;subst;try tauto.
+      - specialize ( IHp x z y (S n)).
+       pose proof IHp H.
+       tauto.
+Qed.
    
       

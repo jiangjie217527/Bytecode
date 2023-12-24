@@ -268,6 +268,8 @@ Proof.
       }
       destruct H3 as [n0 ?].
       subst.
+      pose proof H.
+      rename H3 into F.
       (*----------------完成对n的归纳,此时可以继续化简------------------*)
       simpl in H;sets_unfold in H.
       destruct H as [second_pc_state [first_act_trace [remain_act_trace ? ]]].
@@ -426,6 +428,145 @@ Proof.
               unfold eval_ins in H15.
               destruct first_CPU_state.(inst);simpl in H4;tauto.
             }
+            remember (eval_ins_list_single (first_CPU_state.(inst) :: rm_first_program)) as f.
+             pose proof nsteps_nsteps' f (S n0).
+             sets_unfold in H17.
+             specialize (H17 {| pc_state.pc := first_CPU_state.(pc); pc_state.state := {| memory := fun _ : int256 => zero; program_state.stack := first_CPU_state.(stack) |} |} ({| pc := first_CPU_state.(pc); state := {| memory := in_list_first_mem; program_state.stack := first_CPU_state.(stack) |}; action := first_action |}
+       :: map
+            (fun x : CPU_state * (int256 -> int256) * action_type =>
+             {| pc := (fst (fst x)).(pc); state := {| memory := snd (fst x); program_state.stack := (fst (fst x)).(stack) |}; action := snd x |})
+            (combine (combine rm_first_last_CPU_trace rm_first_mem_list) rm_first_action_trace)) {| pc_state.pc := last_CPU_state.(pc); pc_state.state := {| memory := last_mem; program_state.stack := last_CPU_state.(stack) |} |}).
+            destruct H17;clear H18.
+            pose proof H17 F.
+            simpl in H18;sets_unfold in H18.
+            destruct H18 as [? [? [? [? [? ?]]]]].
+            pose proof nsteps_nsteps' f n0.
+            sets_unfold in H22.
+            specialize (H22 {| pc_state.pc := first_CPU_state.(pc); pc_state.state := {| memory := fun _ : int256 => zero; program_state.stack := first_CPU_state.(stack) |} |} x0 x).
+            destruct H22;clear H22.
+            pose proof H23 H20.
+           unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state.
+          unfold         combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state .
+          pose proof one_step_generate_one_action x {| pc_state.pc := last_CPU_state.(pc); pc_state.state := {| memory := last_mem; program_state.stack := last_CPU_state.(stack) |} |} x1(first_CPU_state.(inst) :: rm_first_program) 0.
+        rewrite Heqf in H21.
+        simpl in H21.
+       inversion H21;clear H21;subst.
+       unfold fold_ins_sem in H25.
+       pose proof H24 H25.
+       rename H25 into A.
+       clear H24 H23 H20 H19 H17.
+       clear H15 H13 H4 F G H5 H3 H12.
+       assert ([{| pc := first_CPU_state.(pc); state := {| memory := fun _ : int256 => zero; program_state.stack := first_CPU_state.(stack) |}; action := first_action |}] = map
+           (fun x : CPU_state * (int256 -> int256) * action_type =>
+            {| pc := (fst (fst x)).(pc); state := {| memory := snd (fst x); program_state.stack := (fst (fst x)).(stack) |}; action := snd x |}) [(first_CPU_state,(fun _ : int256 => zero),first_action)]).
+            {
+              simpl;tauto.
+            }
+            remember (fun x : CPU_state * (int256 -> int256) * action_type =>
+            {| pc := (fst (fst x)).(pc); state := {| memory := snd (fst x); program_state.stack := (fst (fst x)).(stack) |}; action := snd x |}) as g.
+            assert ({| pc := first_CPU_state.(pc); state := {| memory := fun _ : int256 => zero; program_state.stack := first_CPU_state.(stack) |}; action := first_action |}
+      :: map g (combine (combine rm_first_last_CPU_trace rm_first_mem_list) rm_first_action_trace) = map g ([(first_CPU_state, fun _ : int256 => zero, first_action)] ++ (combine (combine rm_first_last_CPU_trace rm_first_mem_list) rm_first_action_trace))).
+      {
+        simpl. 
+        simpl in H3.
+        inversion H3.
+        tauto.
+      }
+      rewrite H4 in H18.
+      pose proof H0.
+      pose proof H1.
+      pose proof H9.
+      symmetry in H5.
+      assert ([(first_CPU_state, fun _ : int256 => zero, first_action)] ++ combine (combine rm_first_last_CPU_trace rm_first_mem_list) rm_first_action_trace = (combine (combine rm_last_two_CPU_trace rm_last_mem_list) rm_last_action_trace ) ++ [(last_two_2_CPU_state ,in_list_last_mem,last_action)]).
+      {
+      pose proof combine_3 rm_last_two_CPU_trace last_two_2_CPU_state rm_last_mem_list in_list_last_mem rm_last_action_trace last_action.
+      pose proof H1.
+      pose proof H7.
+      pose proof H2.
+      pose proof H11.
+      pose proof H8.
+      rewrite <- H19 in H21.
+      rewrite <- H21 in H23.
+      rewrite H23 in H20.
+      pose proof H15 (ltac:(symmetry in H20;tauto)) H23.
+      rewrite <- H24.
+      rewrite <- H5.
+      rewrite <- H12.
+      rewrite <- H13.
+      simpl.
+      tauto.
+      }
+      rewrite H15 in H18.
+      Search (map ?f (?l ++[?x])).
+      pose proof map_last g (combine (combine rm_last_two_CPU_trace rm_last_mem_list) rm_last_action_trace)  (last_two_2_CPU_state, in_list_last_mem, last_action).
+      rewrite H17 in H18.
+      Search (length ?l =1).
+      pose proof length_one_iff_single x1.
+      destruct H19.
+      clear H20.
+      pose proof H19 H16.
+      destruct H20.
+      subst. clear H19.
+      inversion H18.
+      Search (?l ++[?x]=(?l' ++[?y])).
+      pose proof app_inj_tail x0  (map
+        (fun x : CPU_state * (int256 -> int256) * action_type =>
+         {| pc := (fst (fst x)).(pc); state := {| memory := snd (fst x); program_state.stack := (fst (fst x)).(stack) |}; action := snd x |})
+        (combine (combine rm_last_two_CPU_trace rm_last_mem_list) rm_last_action_trace)) x2 {| pc := last_two_2_CPU_state.(pc); state := {| memory := in_list_last_mem; program_state.stack := last_two_2_CPU_state.(stack) |}; action := last_action |} H18.
+        destruct H19.
+        rewrite H19 in H22.
+        Check Lemma.fold_right.
+        pose proof Lemma.fold_right (first_CPU_state.(inst) :: rm_first_program)  x {| pc_state.pc := last_CPU_state.(pc); pc_state.state := {| memory := last_mem; program_state.stack := last_CPU_state.(stack) |} |} x2 0 A.
+        destruct x2.
+        destruct H23.
+        inversion H21.
+        subst.
+        destruct x.
+        simpl in H24.
+        simpl in H23.
+        rewrite H23 in H22.
+        rewrite H24 in H22.
+        tauto.
+      }
+      pose proof H H4.
+      destruct H13.
+      rename x into rm_last_mem_trace.
+      clear G.
+      rewrite H0 in H13.
+      Admitted.
+      (*
+        (*
+        --证明nsteps的废弃代码---
+        rewrite H21 in A.
+        simpl in A.
+        pose proof A.
+        sets_unfold in H23.
+        assert (x =  {| pc_state.pc := last_two_2_CPU_state.(pc); pc_state.state := {| memory := in_list_last_mem; program_state.stack := last_two_2_CPU_state.(stack) |} |}).
+        {
+          destruct H23.
+          + destruct   first_CPU_state.(inst) ;destruct x;inversion H23;simpl in H23;subst;simpl in *;subst.
+             - rewrite H28;tauto.
+             - rewrite H28;tauto.
+             - rewrite H28;tauto.
+             - rewrite H28;tauto.
+             - rewrite H28;tauto. 
+             - rewrite H28;tauto.
+             - rewrite H27;tauto.
+             - rewrite H27;tauto.
+             - rewrite H28;tauto.
+         + 
+                rewrite <- H25.
+                rewrite H28.
+                rewrite <- H27.
+                destruct x.
+                
+                tauto.
+              
+        }*)
+        (*----  不需要分类的废弃代码-----*)
+        (*
+        tauto.
+            rewrite <- H3.
             subst.
             (*分类n是不是0，n为0则倒数第二个就是第一个*)
             destruct rm_first_last_CPU_trace. 
@@ -465,6 +606,8 @@ Proof.
                       pose proof app_after_nil_2 rm_last_mem_list in_list_last_mem (fun _ : int256 => zero) H9.
                       rewrite H20.
                       tauto.
+                      *)
+                      (*
             * (*下面处理n不为0，由于实际使用的条件是，first_CPU_state后面接了一个c*)
                (*所以要分，一个是倒数第二个是c,一个是倒数第二个在rm_first_CPU_trace里面*)
               assert (exists (rm_first_last_two_CPU_trace:list CPU_state),first_CPU_state ::rm_first_last_two_CPU_trace = rm_last_two_CPU_trace).
@@ -584,8 +727,9 @@ Proof.
         simpl in H13.
         remember (eval_ins_list_single
                  (first_CPU_state.(inst) :: rm_first_program)) as f.
-              
+              *)
                  (*------这里特化了一个nsteps的性质*)
+                 (*
         specialize (H13 {|
           pc_state.pc := 0;
           pc_state.state :=
@@ -722,8 +866,124 @@ Proof.
        simpl in H15.
        left.
        tauto.
-       - 
+       - simpl in H5.
+        sets_unfold in H5.
+        destruct H5 as [third_pc_state [second_act_list [ rm_second_act_list [? [? ?]]]]].
+        exists third_pc_state, second_act_list,rm_second_act_list.
+        split.
+        * tauto.
+        * split;tauto.
+    }
+    pose proof H18 H13;clear H18.
+    pose proof nsteps_n_m f (S n1) 1.
+    simpl in H18;sets_unfold in H18;simpl in H18. 
+    remember {| pc_state.pc := 0; pc_state.state := {| memory := fun _ : int256 => zero; program_state.stack := [] |} |} as first_pc.
+    remember [{| pc := first_CPU_state.(pc); state := {| memory := fun _ : int256 => zero; program_state.stack := first_CPU_state.(stack) |}; action := first_action |}] as first_step.
+    Check combine_3.
+    Search rm_first_last_two_a.
+    pose proof combine_3 rm_first_last_two_CPU_trace last_two_2_CPU_state rm_last_two_m last_two_m rm_first_last_two_a last_two_a.
+    rewrite  H17 in H16.
+    pose proof last_length rm_last_two_m last_two_m.
+    rewrite H23 in H16.
+    inversion H16;clear H16.
+    inversion H11;clear H11.
+    pose proof cons_app_length rm_first_two_action  rm_first_last_two_a  second_action  last_two_a H20.
+    rewrite H11 in H24.
+    pose proof cons_app_length rm_first_two_memo rm_last_two_m   second_m last_two_m H17.
+    rewrite H16 in H24.
+    pose proof H22 H24 H25;clear H22.
+    rewrite H26 in H5.
+    pose proof map_last (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {| pc := (fst (fst x)).(pc); state := {| memory := snd (fst x); program_state.stack := (fst (fst x)).(stack) |}; action := snd x |}) (combine (combine rm_first_last_two_CPU_trace rm_last_two_m) rm_first_last_two_a) (last_two_2_CPU_state, last_two_m, last_two_a).
+       rewrite H22 in H5.
+       Search (nsteps).
+       Check nsteps_rt.
+       Check nsteps_nsteps'.
+       pose proof nsteps_nsteps' f (S (S n1)).
+       sets_unfold in H27.
+       specialize (H27 {| pc_state.pc := first_CPU_state.(pc); pc_state.state := {| memory := fun _ : int256 => zero; program_state.stack := first_CPU_state.(stack) |} |}   ({| pc := first_CPU_state.(pc); state := {| memory := fun _ : int256 => zero; program_state.stack := first_CPU_state.(stack) |}; action := first_action |}
+       :: map
+            (fun x : CPU_state * (int256 -> int256) * action_type =>
+             {| pc := (fst (fst x)).(pc); state := {| memory := snd (fst x); program_state.stack := (fst (fst x)).(stack) |}; action := snd x |})
+            (combine (combine (c :: rm_first_last_CPU_trace) (second_m :: rm_first_two_memo)) (second_action :: rm_first_two_action)))
+             {| pc_state.pc := last_CPU_state.(pc); pc_state.state := {| memory := last_mem; program_state.stack := last_CPU_state.(stack) |} |}).
+       destruct H27.
+       clear H28.
+       remember (S n1) as nn.
+       pose proof H27 F;clear H27.
+       simpl in H28;sets_unfold in H28.
+       destruct H28 as [? [? [? [? [? ?]]]]].
+            unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state.
+          unfold         combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state .
+          Check one_step_generate_one_action.
+          pose proof one_step_generate_one_action x {| pc_state.pc := last_CPU_state.(pc); pc_state.state := {| memory := last_mem; program_state.stack := last_CPU_state.(stack) |} |} x1(first_CPU_state.(inst) :: rm_first_program) 0.
+        rewrite Heqf in H29.
+        simpl in H29.
+       inversion H29;clear H29;subst.
+       unfold fold_ins_sem in H31.
+       pose proof H30 H31.
+       assert ({| pc := first_CPU_state.(pc); state := {| memory := fun _ : int256 => zero; program_state.stack := first_CPU_state.(stack) |}; action := first_action |}
+      :: {| pc := c.(pc); state := {| memory := second_m; program_state.stack := c.(stack) |}; action := second_action |}
+         :: map
+              (fun x : CPU_state * (int256 -> int256) * action_type =>
+               {| pc := (fst (fst x)).(pc); state := {| memory := snd (fst x); program_state.stack := (fst (fst x)).(stack) |}; action := snd x |})
+              (combine (combine rm_first_last_CPU_trace rm_first_two_memo) rm_first_two_action) =(map
+          (fun x : CPU_state * (int256 -> int256) * action_type =>
+           {| pc := (fst (fst x)).(pc); state := {| memory := snd (fst x); program_state.stack := (fst (fst x)).(stack) |}; action := snd x |})
+     (combine (combine (first_CPU_state :: rm_first_last_two_CPU_trace) rm_last_mem_list) rm_last_action_trace)) ++
+        [{|
+           pc := (fst (fst (last_two_2_CPU_state, last_two_m, last_two_a))).(pc);
+           state := {| memory := snd (fst (last_two_2_CPU_state, last_two_m, last_two_a)); program_state.stack := (fst (fst (last_two_2_CPU_state, last_two_m, last_two_a))).(stack) |};
+           action := snd (last_two_2_CPU_state, last_two_m, last_two_a)
+         |}]).
+       {
+          Search rm_first_last_two_CPU_trace.
+          rewrite <- H22.
+          
+          assert ([{| pc := first_CPU_state.(pc); state := {| memory := fun _ : int256 => zero; program_state.stack := first_CPU_state.(stack) |}; action := first_action |}] = map
+        (fun x2 : CPU_state * (int256 -> int256) * action_type =>
+         {| pc := (fst (fst x2)).(pc); state := {| memory := snd (fst x2); program_state.stack := (fst (fst x2)).(stack) |}; action := snd x2 |}) [(first_CPU_state,(fun _ : int256 => zero),first_action)] ).
+         {
+            simpl.
+            tauto.
+         }
+         assert ([{| pc := c.(pc); state := {| memory := second_m; program_state.stack := c.(stack) |}; action := second_action |}]=
+         map
+        (fun x2 : CPU_state * (int256 -> int256) * action_type =>
+         {| pc := (fst (fst x2)).(pc); state := {| memory := snd (fst x2); program_state.stack := (fst (fst x2)).(stack) |}; action := snd x2 |}) [(c,second_m,second_action)]).
+         {
+            simpl;tauto.
+         }
+         assert({| pc := first_CPU_state.(pc); state := {| memory := fun _ : int256 => zero; program_state.stack := first_CPU_state.(stack) |}; action := first_action |}
+:: {| pc := c.(pc); state := {| memory := second_m; program_state.stack := c.(stack) |}; action := second_action |}
+   :: map
+        (fun x2 : CPU_state * (int256 -> int256) * action_type =>
+         {| pc := (fst (fst x2)).(pc); state := {| memory := snd (fst x2); program_state.stack := (fst (fst x2)).(stack) |}; action := snd x2 |})
+        (combine (combine rm_first_last_CPU_trace rm_first_two_memo) rm_first_two_action) =  [{| pc := first_CPU_state.(pc); state := {| memory := fun _ : int256 => zero; program_state.stack := first_CPU_state.(stack) |}; action := first_action |}] ++  [{| pc := c.(pc); state := {| memory := second_m; program_state.stack := c.(stack) |}; action := second_action |}]++ map
+        (fun x2 : CPU_state * (int256 -> int256) * action_type =>
+         {| pc := (fst (fst x2)).(pc); state := {| memory := snd (fst x2); program_state.stack := (fst (fst x2)).(stack) |}; action := snd x2 |})
+        (combine (combine rm_first_last_CPU_trace rm_first_two_memo) rm_first_two_action)).
+        {
+          simpl.
+          tauto.
+        }
+         rewrite H34. rewrite H32;rewrite H33.
+         pose proof map_app (fun x2 : CPU_state * (int256 -> int256) * action_type =>
+   {| pc := (fst (fst x2)).(pc); state := {| memory := snd (fst x2); program_state.stack := (fst (fst x2)).(stack) |}; action := snd x2 |}) [(c, second_m, second_action)] (combine (combine rm_first_last_CPU_trace rm_first_two_memo) rm_first_two_action).
+          rewrite <- H35.
+          pose proof map_app (fun x2 : CPU_state * (int256 -> int256) * action_type =>
+   {| pc := (fst (fst x2)).(pc); state := {| memory := snd (fst x2); program_state.stack := (fst (fst x2)).(stack) |}; action := snd x2 |})  [(first_CPU_state, fun _ : int256 => zero, first_action)] ([(c, second_m, second_action)] ++ combine (combine rm_first_last_CPU_trace rm_first_two_memo) rm_first_two_action).
+        rewrite <- H36.
+        assert (([(first_CPU_state, fun _ : int256 => zero, first_action)] ++ [(c, second_m, second_action)] ++ combine (combine rm_first_last_CPU_trace rm_first_two_memo) rm_first_two_action)=(combine (combine rm_first_last_two_CPU_trace rm_last_two_m) rm_first_last_two_a ++ [(last_two_2_CPU_state, last_two_m, last_two_a)])).
+        {
+            simpl.
+            split.
+        }
+       }
+       rewrite H27 in H5.
+       sets_unfold in H5.
        Admitted.
+       *) 
        (*
            }
               (*这里更改了mem和action的表达方式
@@ -739,8 +999,10 @@ Proof.
               *)
               assert (nsteps (eval_ins_list_single (first_CPU_state.(inst) :: rm_first_program)) 1 (combine_to_pc_state last_two_2_CPU_state rm_last_two_m )
               (combine_to_act_state_list [last_CPU_state] [last_mem] [last_two_a]) )
-                     (*
+                   
                }
+               *)
+               (*
             assert (nsteps
        (eval_ins_list_single (first_CPU_state.(inst) :: rm_first_program)) 1 first_CPU_state [{|
            pc := first_CPU_state.(pc);
@@ -754,6 +1016,7 @@ Proof.
             Search (nsteps).
             
       }
+      *)
       - sets_unfold in H15.
         pose proof eval_ins_same_pc.
         pose proof out_property.
@@ -790,11 +1053,5 @@ Proof.
             pose proof zero_not_in_seq_one (Datatypes.length rm_first_program) H4;contradiction.
             
             
+            *)
             
-            
-            
-            
-            
-            
-
-Admitted.*)*)

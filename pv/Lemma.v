@@ -21,6 +21,200 @@ Import CPU_state.
 Import pc_state.
 Import act_state.
 (*-----这不一定成立-------*)
+
+Lemma filter_short:
+  forall [A:Type](P:A->bool)(l:list A),
+length (filter P l) <= length l.
+Proof.
+  intros.
+  induction l.
+  + simpl.
+      lia.
+  + simpl.
+     destruct (P a).
+     - simpl in *.
+       lia.
+     - lia.
+Qed.
+  
+Lemma per_ins_non:
+  forall (l:list action_type), Permutation   (filter mem_ins_type_is_not_non l) l -> (filter mem_ins_type_is_not_non
+           l) = l.
+Proof.
+  intros.
+  pose proof Permutation_length H.
+  induction l.
+  + simpl.
+  tauto.
+  + destruct a.
+     destruct mem_ins0.
+     - simpl in *.
+        inversion H;clear H.
+        inversion H0;clear H0.
+        pose proof IHl H2 H5.
+        * rewrite H.
+        tauto.
+        * tauto.
+        * simpl in *;subst.
+          pose proof Permutation_trans H1 H2.
+          Search (Permutation).
+          pose proof Permutation_cons_inv H.
+          inversion H0.
+          pose proof IHl H3 H5.
+          rewrite H4.
+          tauto.
+    - simpl in *.
+        inversion H;clear H.
+        inversion H0;clear H0.
+        pose proof IHl H2 H5.
+        * rewrite H.
+        tauto.
+        * tauto.
+        * simpl in *;subst.
+          pose proof Permutation_trans H1 H2.
+          Search (Permutation).
+          pose proof Permutation_cons_inv H.
+          inversion H0.
+          pose proof IHl H3 H5.
+          rewrite H4.
+          tauto.
+      - simpl in *.
+        pose proof filter_short mem_ins_type_is_not_non l.
+        rewrite H0 in H1.
+        lia.
+Qed.
+ 
+Lemma per_in:
+  forall [A:Type] (a:A)(l1 l2:list A),
+  Permutation (a::l1) l2 -> In a l2.
+Proof.
+  intros.
+  remember (a::l1) as l'.
+  Check Permutation_in.
+  pose proof Permutation_in.
+  specialize (H0 A).
+    specialize (H0 l' l2 a H).
+    assert (In a l').
+    {
+      rewrite Heql'.
+      unfold In.
+      simpl;tauto.
+    }
+    tauto.
+Qed.
+  
+Lemma find_in:
+  forall (A:Type)(l:list A)(a:A),
+  In a l-> exists (l1 l2:list A), l = l1 ++[a]++l2.
+Proof.
+  intros A l.
+  induction l.
+  + intros. inversion H.
+  + intros. inversion H.
+      - subst.
+        exists [],l.
+        simpl.
+        tauto.
+      - specialize (IHl a0).
+        pose proof IHl H0.
+        destruct H1 as [? [? ?]].
+        exists (a::x),x0.
+        simpl.
+        rewrite H1.
+        tauto.
+Qed. 
+
+Lemma Per_t:
+  forall [A:Type] (P:A->bool )(l:list A)(l':list A)(x:A), Permutation (filter P l') l
+           ->In x l -> P x = true.
+Proof.
+intros.
+pose proof Permutation_sym H.
+  pose proof Permutation_in.y
+  specialize (H2 A l (filter P l') x).
+  pose proof H2 H1 H0.
+  Search (In ?x (filter ?P ?l)).
+  pose proof filter_In.
+  specialize (H4 A P x l').
+  destruct H4;clear H5.
+  pose proof H4 H3;destruct H5.
+  tauto.
+Qed.
+
+(*
+  intros A P l l'.
+  revert l.
+  induction l'.
+  + intros.
+   simpl in H.
+     inversion H;clear H. 
+     - simpl;tauto.
+     - subst.
+     pose proof Permutation_nil H0.
+        subst.
+             pose proof Permutation_nil H1.
+        subst;simpl;tauto.
+ + intros.
+      simpl in H.
+      inversion H;simpl in *.
+      - tauto.
+      - subst.
+      symmetry in H0.
+        destruct (P x).
+        * destruct (P a).
+           ++ inversion H0;subst;clear H0.
+                 Search (Permutation (?x::?l)).
+                 specialize (IHl' l'0 ).
+                 pose proof IHl' H1.
+                 rewrite H0.
+                 tauto.
+           ++ specialize (IHl' (x::l'0 )).
+                  pose proof IHl' H.
+                  simpl in H2.
+                  destruct (P x).
+                  tauto.
+                  assert (length (filter P l'0 ) = length (x::l'0)).
+                  { rewrite H2;tauto. }
+                  pose proof filter_short P l'0.
+                  rewrite H3 in H4.
+                  simpl in H4.
+                  lia.
+        * pose proof filter_short.
+           specialize (H2 A P l'0).
+           destruct (P a).
+           ++ inversion H0;clear H0.
+                  subst.
+                  Search Permutation (?x::?l).
+                  clear  H.
+                  specialize (IHl' l'0).
+                  pose proof IHl' H1.
+                  rewrite H.
+
+                  inversion H4.
+                  pose proof Nat.neq_succ_diag_l (Datatypes.length l'0).
+                  congruence.
+                  inversion H6.
+            
+      - pose proof per_in a (filter P l') l H.
+        pose proof find_in A l a H0.
+        destruct H1 as [? [? ?]].
+        subst.
+        clear H0.
+        simpl in H.
+        Search (Permutation ?l (?x++?l1)).
+        pose proof Permutation_cons_app_inv.
+        specialize (H0 A (filter P l') x x0 a).
+        pose proof H0 H.
+        pose proof IHl' (x++x0) H1.
+        clear H0.
+         Search ( ?l = ?l1 ++[?a]++?l2).
+        specialize (H0 )
+      - 
+       destruct l.
+        * simpl;tauto.
+        * 
+       
+*)
 Lemma map_same:
   forall [A B:Type] (f:A->B) (l l':list A),
   map f l = map f l' -> l = l'.

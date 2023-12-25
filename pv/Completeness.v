@@ -538,7 +538,7 @@ Proof.
       inversion H21;clear H21.
       clear H23.
       subst.
-      
+      clear H H17.
       assert (exists (memory_trace:list action_type),Permutation (filter mem_ins_type_is_not_non (rm_last_mem_trace ++[last_action])) memory_trace /\ memory_constraint memory_trace).
       {
         destruct last_action.
@@ -554,10 +554,54 @@ Proof.
          Search Permutation.
          clear H21.
          simpl.
-         assert (exists (a:action_type),forall (add val:int256) (ins_type:mem_ins_type)(a1:action_type)(add1 val1:int256)(ins_type1:mem_ins_type),In a1 rm_last_mem_trace -> a1.(mem_ins) = ins_type1/\(ins_type1 = read add1 val1 \/ ins_type1 = write add1 val1) -> (Int256.unsigned add1 >=Int256.unsigned add)%Z->(Int256.unsigned add1 = Int256.unsigned add)%Z -> a1.(timestamp)>a.(timestamp) ->In a rm_last_mem_trace /\ a.(mem_ins) = ins_type/\(ins_type = read add val \/ ins_type = write add val) /\ (Int256.unsigned add <= Int256.unsigned address)%Z/\(Int256.unsigned add = Int256.unsigned address)%Z -> a.(timestamp)< timestamp0  ->(Int256.unsigned add1 >=Int256.unsigned address)%Z/\(add1 = address -> a1.(timestamp)>timestamp0) ).
+         (*先对rm_last_memory的性质化简*)
+         inversion H22.
+         * simpl.
+            exists [{|
+       timestamp := timestamp0;
+       mem_ins := read address value
+     |}] .
+          split.
+          ++ apply perm_skip.
+                apply perm_nil.
+          ++ subst. 
+                pose proof Permutation_sym H13.
+                pose proof Permutation_nil H21.
+                inversion H16;clear H16;subst.
+                inversion H24;subst.
+                inversion H27;clear H27;subst.
+                -- 
+                
+                Search (Permutation  [] ?l).
+          trace_memory_single_read with (action:={|
+     timestamp := timestamp0;
+     mem_ins := read address value
+   |}) (address:=address).
+         (*------------要找到last_action插入的位置，
+         就要找到last_action前一个元素
+         1. 如果这个元素不存在，那就是last_action比所有的地址都小
+         2. 如果这个元素存在，那就是，首先这个元素的地址要小于等于last_action,如果等于，那么时间戳小于last_action(满足下界)
+         3. 存在则还要满足是下界的上确界，也就是要么任意一个满足下界的都比它小，要么就是任意一个比它大的元素都不满足下界*)
+         assert(forall (a:action_type)(ins_type0:mem_ins_type)(add0 val0:int256),
+         In a rm_last_mem_trace   ->
+         a.(mem_ins) = ins_type0/\(ins_type0 = read add0 val0 \/ ins_type0 = write add0 val0) -> 
+         ((Int256.unsigned add0 <= Int256.unsigned address)%Z)\/       (exists (lb:action_type),forall(ins_type1:mem_ins_type) (add1 val1:int256), 
+         In lb rm_last_mem_trace  ->
+         lb.(mem_ins) = ins_type1/\(ins_type1 = read add1 val1 \/ ins_type1 = write add1 val1) -> 
+         (
+         (Int256.unsigned add1 <=Int256.unsigned address)%Z/\(add1 = address -> lb.(timestamp)<timestamp0) 
+         ) ->(*满足下界为前提*)
+         (
+         (Int256.unsigned add0 >=Int256.unsigned add1)%Z/\(add0 = add1 -> a.(timestamp)>lb.(timestamp)) (*---给定的a比它大*)
+         )
+         -> (
+        (Int256.unsigned add0 >=Int256.unsigned address)%Z/\(add0 = address -> a.(timestamp)>timestamp0) 
+         ) (*---不满足下界*)
+         ) ).
          {
-         
+         admit.
          }
+         
          Admitted.
       (*
       - sets_unfold in H15.
@@ -597,3 +641,18 @@ Proof.
             
             
             *)
+            
+            
+            (*
+         assert (exists (lb:action_type),
+         In a rm_last_mem_trace   ->
+         In a1 rm_last_mem_trace ->
+         a1.(mem_ins) = ins_type1/\(ins_type1 = read add1 val1 \/ ins_type1 = write add1 val1) -> 
+         a.(mem_ins) = ins_type/\(ins_type = read add0 val0 \/ ins_type = write add0 val0) ->
+         (Int256.unsigned add1 >=Int256.unsigned add0)%Z->
+         ((Int256.unsigned add1 = Int256.unsigned add)%Z ->a1.(timestamp)>a.(timestamp)) ->
+          (Int256.unsigned add <= Int256.unsigned address)%Z/\(Int256.unsigned add = Int256.unsigned address)%Z -> a.(timestamp)< timestamp0  ->(Int256.unsigned add1 >=Int256.unsigned address)%Z/\(add1 = address -> a1.(timestamp)>timestamp0) ).
+         {
+         
+         }
+         *)

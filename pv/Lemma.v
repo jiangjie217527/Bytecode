@@ -130,7 +130,7 @@ Lemma Per_t:
 Proof.
 intros.
 pose proof Permutation_sym H.
-  pose proof Permutation_in.y
+  pose proof Permutation_in.
   specialize (H2 A l (filter P l') x).
   pose proof H2 H1 H0.
   Search (In ?x (filter ?P ?l)).
@@ -1516,4 +1516,411 @@ Proof.
        tauto.
 Qed.
    
-      
+Lemma cons_cons:
+  forall [A:Type] (l:list A)(x y:A),
+  l++[x]++[y]=l++[x;y].
+Proof.
+  intros.
+  simpl.
+  tauto.
+Qed.
+
+Lemma same_list:
+  forall [A:Type] (l:list A)(x y:A),
+  l++[x]++[y]=(l++[x])++[y].
+Proof.
+  intros A l.
+  induction l.
+  + simpl;tauto.
+  + intros.
+     simpl.
+     specialize (IHl x y).
+     simpl in IHl.
+     rewrite IHl.
+     tauto.
+Qed. 
+    
+Lemma out_is_false:
+  forall(p:list ins) (s3:pc_state)(s2:act_state)(mem:int256->int256),
+  List.fold_right Sets.union ∅
+        (map eval_ins
+           (combine p
+              (seq 1 (Datatypes.length p))))
+        {|
+          pc_state.pc := 0;
+          pc_state.state :=
+            {|
+              memory := mem;
+              program_state.stack := []
+            |}
+        |}
+        [s2] s3 -> False.
+Proof.
+  intros.
+  sets_unfold in H.
+        pose proof eval_ins_same_pc.
+        pose proof out_property.
+        specialize (H1 ins pc_state (list act_state) pc_state).
+        specialize(H1 (combine p (seq 1 (Datatypes.length p)))).
+        specialize (H1 eval_ins).
+        specialize(H1  ({|          pc_state.pc := 0;          pc_state.state :=            {|              memory := mem; program_state.stack := []            |}        |})  [s2] s3).
+       specialize (H1 p (seq 1 (Datatypes.length p))).
+       pose proof H1 H0 H (ltac:(tauto));clear H1.
+       pose proof seq_length (Datatypes.length p) 1.
+       symmetry in H1.
+       pose proof H2 H1;clear H2.
+       destruct H3 as [x [? ?]].
+       destruct x.
+       unfold eval_ins in H2.
+       destruct i;inversion H2;subst. inversion H8;simpl in *.
+       ++  pose proof in_combine_r p (seq 1 (Datatypes.length p)) JUMPI 0 H3.
+            pose proof zero_not_in_seq_one (Datatypes.length p) H4;contradiction.
+             ++  pose proof in_combine_r p (seq 1 (Datatypes.length p)) JUMP 0 H3.
+            pose proof zero_not_in_seq_one (Datatypes.length p) H4;contradiction.
+              ++  pose proof in_combine_r p (seq 1 (Datatypes.length p)) POP 0 H3.
+            pose proof zero_not_in_seq_one (Datatypes.length p) H4;contradiction.
+            ++  pose proof in_combine_r p (seq 1 (Datatypes.length p)) ADD 0 H3.
+            pose proof zero_not_in_seq_one (Datatypes.length p) H4;contradiction.
+            ++  pose proof in_combine_r p (seq 1 (Datatypes.length p)) MUL 0 H3.
+            pose proof zero_not_in_seq_one (Datatypes.length p) H4;contradiction.
+            ++  pose proof in_combine_r p (seq 1 (Datatypes.length p)) SUB 0 H3.
+            pose proof zero_not_in_seq_one (Datatypes.length p) H4;contradiction.
+            ++  pose proof in_combine_r p (seq 1 (Datatypes.length p)) MLOAD 0 H3.
+            pose proof zero_not_in_seq_one (Datatypes.length p) H4;contradiction.
+            ++  pose proof in_combine_r p (seq 1 (Datatypes.length p)) MSTORE 0 H3.
+            pose proof zero_not_in_seq_one (Datatypes.length p) H4;contradiction.
+            ++  pose proof in_combine_r p (seq 1 (Datatypes.length p)) (PUSH32 v) 0 H3.
+            pose proof zero_not_in_seq_one (Datatypes.length p) H4;contradiction.
+Qed.
+  
+Lemma fu_k_ing_lemma:
+  forall (C:list CPU_state) (M:list (int256->int256))(A:list action_type),
+  M = [] -> combine (combine C M) A = [].
+Proof.
+  intros.
+  rewrite H;clear H;revert A.
+  induction C.
+  + simpl;tauto.
+  + intros.
+     pose proof combine_nil.
+     simpl. tauto.
+Qed.
+  
+  
+Lemma mem_is_zero:
+  forall (p:list ins) (action_trace memory_trace:list action_type)
+(last_CPU_state:CPU_state)(CPU_trace:list CPU_state)(last_mem : int256 -> int256),
+(exists
+              (mem_list : list (int256 -> int256)) ,
+              Datatypes.length mem_list =
+              Datatypes.length action_trace /\
+              eval_ins_list p {|
+          pc_state.pc := 0;
+          pc_state.state :=
+            {|
+              memory := fun _ : int256 => zero;
+              program_state.stack := []
+            |}
+        |}
+                (combine_to_act_state_list
+                   CPU_trace mem_list
+                   action_trace)
+                (combine_to_pc_state last_CPU_state
+                   last_mem))->filter mem_ins_type_is_not_non action_trace = [] -> last_mem = fun _ : int256 => zero.
+Proof.
+  intros p action_trace.
+  revert p.
+  induction action_trace.
+  + intros.
+      destruct H as [? [? ?]].
+                  unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H1.
+                  unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H1.
+    simpl in H.
+    pose proof length_zero_iff_nil x.
+    destruct H2.
+    clear H3;pose proof H2 H.
+    subst;clear H2 H.
+     simpl in H1.
+     pose proof fu_k_ing_lemma CPU_trace [] [] (ltac:(tauto)).
+     rewrite H in H1.
+     simpl in H1.
+     inversion H1;clear H1;subst.
+     inversion H6;clear H6;subst.
+     destruct x.
+     - simpl in H1;sets_unfold in H1.
+        destruct H1;clear H1 H5.
+        inversion H6;clear H6;tauto.
+     - simpl in H1;sets_unfold in H1.
+        destruct H1 as [? [? [? [? [? ?]]]]].
+        pose proof one_step_generate_one_action {|
+         pc_state.pc := 0;
+         pc_state.state :=
+           {|
+             memory := fun _ : int256 => zero;
+             program_state.stack := []
+           |}
+       |} x0 x1 p 0.
+       inversion H6;clear H6;subst.
+       unfold fold_ins_sem in H9;sets_unfold in H9.
+       pose proof H8 H9.
+       destruct x1.
+       * simpl in H6.
+          discriminate.
+       * inversion H1.
+    + intros.
+        destruct H as [? [? ?]].
+        
+Admitted.
+    
+Lemma exists_memory_trace:
+  forall (mem_trace0 action_trace0:list action_type)(last_action last_two_action:action_type)(CPU_trace0:list CPU_state) (last_two_CPU_state last_CPU_state first_CPU_state:CPU_state) (p:list ins) (last_two_mem last_mem:int256->int256), 
+  (exists
+              (mem_list : list (int256 -> int256)) 
+            (first_mem last_mem : int256 -> int256),
+              Datatypes.length mem_list =
+              Datatypes.length action_trace0 /\
+              eval_ins_list p (combine_to_pc_state first_CPU_state
+                   first_mem)
+                (combine_to_act_state_list
+                   CPU_trace0 mem_list
+                   action_trace0)
+                (combine_to_pc_state last_two_CPU_state
+                   last_mem))->
+  memory_constraint mem_trace0 -> 
+action_trace_constraint (CPU_trace0++[last_two_CPU_state]) (action_trace0++[last_two_action]) ->
+Permutation (filter mem_ins_type_is_not_non (action_trace0++[last_two_action])) mem_trace0 ->
+CPU_trace_constraint (CPU_trace0++[last_two_CPU_state]) ->
+List.fold_right Sets.union ∅
+      (map eval_ins
+         (combine p  (seq 0 (Datatypes.length p))))      {|
+        pc_state.pc := last_two_CPU_state.(pc);
+        pc_state.state :=
+          {|
+            memory := last_two_mem;
+            program_state.stack :=
+              last_two_CPU_state.(stack)
+          |}
+      |}
+      (map
+         (fun
+            x : CPU_state * (int256 -> int256) *
+                action_type =>
+          {|
+            pc := (fst (fst x)).(pc);
+            state :=
+              {|
+                memory := snd (fst x);
+                program_state.stack :=
+                  (fst (fst x)).(stack)
+              |};
+            action := snd x
+          |})
+         [(last_two_CPU_state, last_two_mem,
+          last_action)])
+      {|
+        pc_state.pc := last_CPU_state.(pc);
+        pc_state.state :=
+          {|
+            memory := last_mem;
+            program_state.stack := last_CPU_state.(stack)
+          |}
+      |} ->
+  (last_action.(mem_ins)=non -> exists (mem_trace1:list action_type),mem_trace1 = mem_trace0)\/(
+  forall (add val:int256),(last_action.(mem_ins) = read add val)\/((last_action.(mem_ins) = write add val)) -> (exists (mem_trace1:list action_type), mem_trace1 = last_action::mem_trace0/\memory_constraint mem_trace1)\/ (exists (a:action_type) (l1 l2:list action_type),mem_trace0 = l1 ++[a] ++l2 ->exists (mem_trace1:list action_type), mem_trace1 = l1 ++[a]++[last_action]++l2/\ memory_constraint mem_trace1)).
+Proof.
+  intros mem_trace0.
+  induction mem_trace0.
+  + intros.
+      destruct last_action.
+      destruct mem_ins0.
+      - right.
+        intros.
+        subst.
+        inversion H5;inversion H6;subst;clear H5 H6.
+        pose proof Permutation_sym H2.
+        pose proof Permutation_nil H5;clear H5 H2.
+        left.
+        exists [{|
+     timestamp := timestamp0;
+     mem_ins := read add0 val
+   |}] .
+        split. tauto.
+        destruct H as [mem_list [first_mem [rm_last_mem [? ?]]]].
+        inversion H2;clear H2;subst.
+        simpl in *;subst.
+        inversion H1;clear H1;subst.
+        inversion H2. 
+        destruct action_trace0;simpl in H11; inversion H11.
+        pose proof app_last_corr l_action action_trace0 action0 last_two_action H7. clear H7.
+        destruct H13;subst.
+        pose proof app_last_corr (l++[x]) CPU_trace0 y last_two_CPU_state H1. clear H1.
+        destruct H7;subst.
+           pose proof filter_cons_app_single mem_ins_type_is_not_non action_trace0 last_two_action.
+           rewrite H1 in H6;clear H1.
+        inversion H11;clear H11;subst;destruct last_two_action;    simpl in H7;subst;simpl in H6.
+        * (*--MLOAD---*)
+         destruct (filter mem_ins_type_is_not_non action_trace0);simpl in H6;discriminate.
+        *  (*---MSTORE---*)
+         destruct (filter mem_ins_type_is_not_non action_trace0);simpl in H6;discriminate.
+         * simpl in H13.
+            subst.
+            inversion H12;clear H12.
+            ++ symmetry in H13.
+                  pose proof app_after_nil_1 l x x0 H13.
+                  subst.
+                  simpl in H13.
+                  inversion H13;clear H13;subst.
+                  unfold combine_to_pc_state,combine_to_act_state_list,Definition_and_soundness.Build_pc_state, Definition_and_soundness.Build_program_state in H10.
+                  unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H10.
+                  simpl in *.
+                  pose proof length_zero_iff_nil mem_list.
+                  destruct H11. clear H12.
+                  pose proof H11 H. clear H.
+                  subst.
+                  simpl in H10.
+                  destruct H10 as[n ?].
+                  destruct n.
+                  -- simpl in H;sets_unfold in H.
+                      destruct H.
+                      inversion H10;clear H10.
+                      subst.
+                      rewrite H5 in H13.
+                      rewrite H8 in H15.
+                      symmetry in H13,H15.
+                      subst;clear H H6.
+                      rewrite H13 in H4.
+                      rewrite H15 in H4.
+                      unfold List.fold_right in H4;sets_unfold in H4.
+                      destruct p.
+                      ** simpl in H4.
+                           contradiction.
+                      ** simpl in H4.
+                          destruct H4.
+                          {
+                            destruct i.
+                            + inversion H;clear H;simpl in *;subst.
+                                inversion H10.
+                            + inversion H;clear H;simpl in *;subst.
+                                inversion H10.
+                             + inversion H;clear H;simpl in *;subst.
+                                inversion H10.
+                              + inversion H;clear H;simpl in *;subst.
+                                inversion H10.
+                           + inversion H;clear H;simpl in *;subst.
+                                inversion H10.
+                            + inversion H;clear H;simpl in *;subst.
+                                inversion H10.
+                            + inversion H;clear H;simpl in *;subst.
+                                inversion H16.   
+                            + inversion H;clear H;simpl in *;subst.
+                                inversion H16.
+                            + inversion H;clear H;simpl in *;subst.
+                                inversion H10.        
+                          }
+                          pose proof out_is_false p 
+{|
+        pc_state.pc := last_CPU_state.(pc);
+        pc_state.state :=
+          {|
+            memory := last_mem;
+            program_state.stack := last_CPU_state.(stack)
+          |}
+      |} {|
+         pc := 0;
+         state :=
+           {|
+             memory := last_two_mem; program_state.stack := []
+           |};
+         action :=
+           {|
+             timestamp := timestamp0; mem_ins := read add0 val
+           |}
+       |} last_two_mem H.
+       contradiction.
+                  -- simpl in H;sets_unfold in H.
+                      destruct H as [?[?[?[? [? ?]]]]].
+                      pose proof one_step_generate_one_action {|
+          pc_state.pc := first_CPU_state.(pc);
+          pc_state.state :=
+            {|
+              memory := fun _ : int256 => zero;
+              program_state.stack := first_CPU_state.(stack)
+            |}
+        |} x x1 p 0.
+        inversion H10;clear H10;subst.
+        unfold fold_ins_sem in H14.
+        sets_unfold in H14;simpl in H14.
+        pose proof H13 H14.
+        pose proof H.
+        {
+          destruct x1.
+          + inversion H10.
+          + simpl in H15;inversion H15.
+        }
+        ++ simpl in H6.
+Admitted.
+(*
+        
+                          inversion H2;clear H2.
+                          Search (?l++[?x]).
+                          Check same_list.
+                          pose proof same_list l x y.
+                          rewrite <- H2 in H4.
+                          pose proof cons_cons l x y.
+                          rewrite H14 in H4. 
+                          pose proof app_cat l [] x y x0 last_two_CPU_state H4.
+
+                  
+        destruct (filter mem_ins_type_is_not_non action_trace0);simpl in H6;discriminate.
+           symmetry in H7.
+           pose proof app_after_nil_1 CPU_trace0  last_two_CPU_state x H7;subst.
+           simpl in H7.
+           inversion H7;clear H7;subst.
+           simpl in H.
+           inversion H;clear H;subst.
+           simpl in H0.
+           inversion H0;clear H0;subst.
+           inversion H;clear H.
+           ++ destruct action_trace0;simpl in H6;inversion H6.
+           ++ Search (?l++[?x]).
+                  pose proof app_after_nil_1 (l++[x]) y first_CPU_state H0. 
+                  destruct l;simpl in H;inversion H.
+        * Search (?l ++[?x]=(?l'++[?y])).
+          pose proof cons_cons l x y.
+          pose proof same_list l x y. 
+          rewrite <- H6 in H2.
+          rewrite H9 in H2.
+         pose proof app_last_corr (l++[x]) CPU_trace0 y  last_two_CPU_state H2. clear H6 H9.
+         destruct H10;subst;clear H2.
+         sets_unfold in H3.
+         *)
+         
+                  (*
+            pose proof app_cat (l ++ [x]) [] y first_CPU_state H0.
+           pose proof app_after_nil_1 CPU_trace0  last_two_CPU_state x H7;subst.
+           inversion H7;clear H7;subst.
+           inversion H0;clear H0;subst.
+           inversion H5;clear H5;subst.
+           ++ (*adjacent CPU*)
+                  inversion H6;clear H6;subst.
+                  Search (?l++[?x;?y]).
+                  pose proof app_cat l [] x y first_CPU_state last_two_CPU_state H0.
+                  simpl in H6.
+                  Search (?l++[?x]).
+                  pose proof app_after_nil_1 l x first_CPU_state H6;subst.
+                  simpl in H0.
+                  inversion H0;subst.
+                  clear H6 H0.
+                  unfold eval_constraint in H5.
+                  simpl in H5.
+                  inversion H5.
+                  -- 
+                  simpl in H0.
+                  inversion H0;clear H0.
+                  *)
+        
+  
+  
+  
+  
+  

@@ -128,27 +128,6 @@ Proof.
      pose proof last_length rm_last_two_CPU_trace  last_two_2_CPU_state .
      rewrite H1 in H2;clear H1.
      pose proof len_succ action_trace (Datatypes.length rm_last_two_CPU_trace) H2.
-                    (*这个assert证明确实能拆,但其实有lemma可以直接用,太神奇辣（气）*)
-                    (*
-     assert (exists (rm_last_action_trace:list action_type)(a:action_type), rm_last_action_trace++[a]=action_trace
-/\Datatypes.length rm_last_two_CPU_trace = Datatypes.length rm_last_action_trace).
-{
-     destruct action_trace.
-     simpl in H2.
-     + inversion H2.
-     + pose proof cons_app_eq a action_trace.
-        destruct H1 as [ls [rm_ls ?]].
-        exists rm_ls,ls.
-        symmetry in H1.
-        split.
-        - tauto.
-        - rewrite <- H1 in H2.
-          Search (length (?l ++ ?x)).
-          pose proof last_length rm_ls ls.
-          rewrite H6 in H2;clear H6.
-          lia.
-}
-*)
      destruct H1 as[first_action [rm_first_action_trace ?]];subst.
      pose proof cons_app_eq first_action rm_first_action_trace.
      destruct H1 as [last_action [rm_last_action_trace ?]].
@@ -275,7 +254,6 @@ Proof.
       destruct H as [second_pc_state [first_act_trace [remain_act_trace ? ]]].
       destruct H as [? [? ?]].
       inversion H3;clear H3;subst.
-
       pose proof one_step_generate_one_action ({|
           pc_state.pc := first_CPU_state.(pc);
           pc_state.state :=
@@ -519,8 +497,8 @@ Proof.
         (combine (combine rm_last_two_CPU_trace rm_last_mem_list) rm_last_action_trace)) x2 {| pc := last_two_2_CPU_state.(pc); state := {| memory := in_list_last_mem; program_state.stack := last_two_2_CPU_state.(stack) |}; action := last_action |} H18.
         destruct H19.
         rewrite H19 in H22.
-        Check Lemma.fold_right.
-        pose proof Lemma.fold_right (first_CPU_state.(inst) :: rm_first_program)  x {| pc_state.pc := last_CPU_state.(pc); pc_state.state := {| memory := last_mem; program_state.stack := last_CPU_state.(stack) |} |} x2 0 A.
+        Check fold_right_sem.
+        pose proof fold_right_sem (first_CPU_state.(inst) :: rm_first_program)  x {| pc_state.pc := last_CPU_state.(pc); pc_state.state := {| memory := last_mem; program_state.stack := last_CPU_state.(stack) |} |} x2 0 A.
         destruct x2.
         destruct H23.
         inversion H21.
@@ -722,14 +700,14 @@ Proof.
       }
       clear H17.
       subst.
-      pose proof Lemma.fold_right (first_CPU_state.(inst) :: rm_first_program) x {|
+      pose proof fold_right_sem (first_CPU_state.(inst) :: rm_first_program) x {|
         pc_state.pc := last_CPU_state.(pc);
         pc_state.state :=
           {|
             memory := last_mem;
             program_state.stack := last_CPU_state.(stack)
           |}
-      |}  ((fun
+      |}  ((fun(simpl+sets_unfold) 
             x : CPU_state * (int256 -> int256) *
                 action_type =>
           {|
@@ -756,6 +734,9 @@ Proof.
                (Datatypes.length
                   (first_CPU_state.(inst)
                    :: rm_first_program)))))) as h.
+      (*check point*)
+      
+      
       (*----由此得到x1确实是最后一个action_trace*)
       (*
       (*写注释找一找那里证明了倒数第二步可以走到最后一步*)

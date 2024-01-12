@@ -22,6 +22,143 @@ Import CPU_state.
 Import pc_state.
 Import act_state.
 
+Search int256.
+Definition my_constant:int256 :=Int256.repr 1.
+
+Lemma a_or_false:
+  forall [A:Prop],A\/False->A.
+Proof.
+  intros.
+  destruct H.
+  + tauto.
+  + contradiction.
+Qed.
+
+Theorem completeness_of_example:
+forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace:
+list CPU_state)
+  (first_CPU_state last_CPU_state: CPU_state)
+  (action_trace: list action_type),
+  program = [(PUSH32 (Int256.repr 1))] -> (*program取特殊值*)
+  CPU_trace = cons first_CPU_state rm_first_CPU_trace ->
+  CPU_trace = rm_last_CPU_trace ++ [last_CPU_state] ->
+  length rm_last_CPU_trace = length action_trace -> (* 新增条件 *)
+  program <> [] -> (* 新增条件 *)
+  multiset_constraint CPU_trace program -> (* 新增条件 *)(*Used to be like last version,now no difference*)
+  (exists (mem_list: list (int256 -> int256))(first_mem last_mem: int256 ->
+  int256),
+  length mem_list = length action_trace /\
+  eval_ins_list program
+  (combine_to_pc_state first_CPU_state first_mem)
+  (combine_to_act_state_list rm_last_CPU_trace mem_list action_trace) (* 注
+  意这里 combine_to_act_state_list 是用 combine 实现的，不要求 rm_last_CPU_trace 
+  和 mem_list 以及 action_trace 长度相等 *)
+  (combine_to_pc_state last_CPU_state last_mem))
+  -> exists (memory_trace: list action_type), constraints program CPU_trace
+  action_trace memory_trace. (* 需要用条件和归纳假设自行构造 memory_trace *)
+Proof.
+  intros program CPU_trace rm_first_CPU_trace rm_last_CPU_trace first_CPU_state last_CPU_state action_trace.
+  revert program CPU_trace rm_first_CPU_trace first_CPU_state last_CPU_state action_trace.
+  apply rev_ind with (l:=rm_last_CPU_trace).
+  +
+  intros.
+  subst.
+  clear H3.
+  inversion H4;rename H4 into G.
+  simpl in H.
+  inversion H;clear H.
+  pose proof a_or_false H7. 
+  clear H7.
+  inversion H;clear H.
+  symmetry in H9,H10.
+  rewrite H9 in H4.
+  rewrite H10 in H4.
+  destruct H5 as [mem_list [first_mem[last_mem[? ?]]]].
+  inversion H5;clear H5.
+  simpl in *;subst.
+  destruct H14.
+    assert(rm_first_CPU_trace=[]).
+  {admit. }
+  subst.
+  assert (action_trace=[]).
+  {admit. }
+  inversion H1.
+  subst.
+   assert (mem_list=[]).
+  {admit. }
+  inversion H1.
+  subst.
+  exists [].
+  destruct x.
+  - simpl in H0;sets_unfold in H0.
+    destruct H0;subst.
+    split.
+    ++
+           apply trace_CPU with (CPU_trace:=[last_CPU_state])(rm_first_CPU_trace:=[])(first_CPU_state:=last_CPU_state).
+          -- tauto.
+          -- tauto.
+          -- tauto.
+          -- pose proof adjacent_CPU_state_nil eval_constraint last_CPU_state.
+              tauto.
+      ++ tauto.
+      ++   apply ActionListTraceNil.
+      ++ apply trace_action with (CPU_trace:=[last_CPU_state]) (action_trace:=[]).
+        apply adjacent_CPU_state_for_action_trace_nil with (x:= last_CPU_state).
+      ++ apply permutation with (action_trace:=[])(memory_trace:=[]).
+        simpl.
+        apply perm_nil.
+      ++ apply trace_momory_nil.
+      ++ apply public with (program:= [PUSH32 (repr 1)])(CPU_trace:= [last_CPU_state])(action_trace:=[])(memory_trace:=[]).
+    -simpl in H0;sets_unfold in H0.
+     destruct H0 as [? [? [? [? [? ?]]]]].
+     unfold combine_to_act_state_list in H0.
+     simpl in H0.
+     inversion H3;clear H3;simpl in *;subst.
+     unfold fold_ins_sem in H5; sets_unfold in H5.
+     pose proof one_step_generate_one_action (combine_to_pc_state last_CPU_state
+          (fun _ : int256 => zero)) x0 x1 [(PUSH32 (repr 1))]  0 H5.
+     admit.
+     + intros.
+     destruct H6 as [mem_list [first_mem [last_mem [? ?]]]].
+         inversion H7;clear H7;simpl in *;subst.
+         destruct H12.
+         destruct x0.
+         -
+         simpl in H0;sets_unfold in H0;destruct H0.
+      unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H0.
+          simpl in H0.
+          pose proof map_eq_nil(fun x : CPU_state * (int256 -> int256) * action_type =>
+        {|
+          pc := (fst (fst x)).(pc);
+          state :=
+            {|
+              memory := snd (fst x);
+              program_state.stack := (fst (fst x)).(stack)
+            |};
+          action := snd x
+        |}) (combine (combine (l ++ [x]) mem_list) action_trace) H0.
+        admit.
+        -simpl in H0;sets_unfold in H0.
+         destruct H0 as [? [? [? [? [? ?]]]]].
+         assert(x0 = 0).
+         {admit. }
+         subst.
+         simpl in H7;sets_unfold in H7.
+         destruct H7;subst.
+         inversion H1;clear H1;subst;simpl in *.
+         inversion H7;clear H7.
+         simpl in H1.
+         inversion H1; clear H1;simpl in *;subst.
+         ++ unfold Definition_and_soundness.Build_program_state in H7.
+                exists [].
+                Admitted.
+         
+     
+     
+
+      
+
+
 Theorem completeness_of_protocol:
 forall (program: list ins)(CPU_trace rm_first_CPU_trace rm_last_CPU_trace:
 list CPU_state)
@@ -108,6 +245,8 @@ Proof.
      rename l into rm_last_two_CPU_trace.
      rename x into last_two_2_CPU_state.
      pose proof H5.
+     pose proof H4.
+     rename H6 into B.
      rename H0 into G. (*增援未来*)
      (*--------改完了------*)
      (*----------------------------------把CPU_trace细分-----------------*)
@@ -707,7 +846,7 @@ Proof.
             memory := last_mem;
             program_state.stack := last_CPU_state.(stack)
           |}
-      |}  ((fun(simpl+sets_unfold) 
+      |} ((fun
             x : CPU_state * (int256 -> int256) *
                 action_type =>
           {|
@@ -734,78 +873,169 @@ Proof.
                (Datatypes.length
                   (first_CPU_state.(inst)
                    :: rm_first_program)))))) as h.
+          
       (*check point*)
-      
-      
-      (*----由此得到x1确实是最后一个action_trace*)
-      (*
-      (*写注释找一找那里证明了倒数第二步可以走到最后一步*)
-      (*---------接下来：先通过actoin_*)
-      assert (exists (memory_trace:list action_type),Permutation (filter mem_ins_type_is_not_non (rm_last_mem_trace ++[last_action])) memory_trace /\ memory_constraint memory_trace).
+      assert ((last_action.(mem_ins)=non /\ exists (mem_trace1:list action_type),mem_trace1 = rm_last_mem_trace)\/(
+  exists (add val:int256),(last_action.(mem_ins)=non ->False)/\( ((last_action.(mem_ins) = read add val)\/((last_action.(mem_ins) = write add val))) /\ ((exists (mem_trace1:list action_type), mem_trace1 = last_action::rm_last_mem_trace/\memory_constraint mem_trace1)\/ (exists (a:action_type) (l1 l2:list action_type),rm_last_mem_trace = l1 ++[a] ++l2 ->exists (mem_trace1:list action_type), mem_trace1 = l1 ++[a]++[last_action]++l2/\ memory_constraint mem_trace1))))).
       {
-        destruct last_action.
-        destruct mem_ins0.
-        + 
-            pose proof filter_cons_app_single mem_ins_type_is_not_non rm_last_mem_trace {|
-           timestamp := timestamp0;
-           mem_ins := read address value
-         |}.
-         
-         rewrite H21.
-         Search (filter mem_ins_type_is_not_non ?l).
-         Search Permutation.
-         clear H21.
-         simpl.
-         (*先对rm_last_memory的性质化简*)
-         inversion H22.
-         * simpl.
-            exists [{|
-       timestamp := timestamp0;
-       mem_ins := read address value
-     |}] .
-          split.
-          ++ apply perm_skip.
-                apply perm_nil.
-          ++ subst. 
-                pose proof Permutation_sym H13.
-                pose proof Permutation_nil H21.
-                inversion H16;clear H16;subst.
-                inversion H24;subst.
-                inversion H27;clear H27;subst.
-                -- 
-                
-                Search (Permutation  [] ?l).
-          trace_memory_single_read with (action:={|
-     timestamp := timestamp0;
-     mem_ins := read address value
-   |}) (address:=address).
-         (*------------要找到last_action插入的位置，
-         就要找到last_action前一个元素
-         1. 如果这个元素不存在，那就是last_action比所有的地址都小
-         2. 如果这个元素存在，那就是，首先这个元素的地址要小于等于last_action,如果等于，那么时间戳小于last_action(满足下界)
-         3. 存在则还要满足是下界的上确界，也就是要么任意一个满足下界的都比它小，要么就是任意一个比它大的元素都不满足下界*)
-         assert(forall (a:action_type)(ins_type0:mem_ins_type)(add0 val0:int256),
-         In a rm_last_mem_trace   ->
-         a.(mem_ins) = ins_type0/\(ins_type0 = read add0 val0 \/ ins_type0 = write add0 val0) -> 
-         ((Int256.unsigned add0 <= Int256.unsigned address)%Z)\/       (exists (lb:action_type),forall(ins_type1:mem_ins_type) (add1 val1:int256), 
-         In lb rm_last_mem_trace  ->
-         lb.(mem_ins) = ins_type1/\(ins_type1 = read add1 val1 \/ ins_type1 = write add1 val1) -> 
-         (
-         (Int256.unsigned add1 <=Int256.unsigned address)%Z/\(add1 = address -> lb.(timestamp)<timestamp0) 
-         ) ->(*满足下界为前提*)
-         (
-         (Int256.unsigned add0 >=Int256.unsigned add1)%Z/\(add0 = add1 -> a.(timestamp)>lb.(timestamp)) (*---给定的a比它大*)
-         )
-         -> (
-        (Int256.unsigned add0 >=Int256.unsigned address)%Z/\(add0 = address -> a.(timestamp)>timestamp0) 
-         ) (*---不满足下界*)
-         ) ).
+      admit.
+      }
+      destruct H4.
+    * destruct H4.
+      clear H17;exists rm_last_mem_trace.
+      split.
+      ++ apply trace_CPU with (CPU_trace:=first_CPU_state :: rm_first_last_CPU_trace ++ [last_CPU_state]) (rm_first_CPU_trace:=rm_first_last_CPU_trace ++ [last_CPU_state])(first_CPU_state:=first_CPU_state).
+        -- tauto.
+        -- tauto.
+        -- tauto.
+        -- inversion H16;clear H16.
+        Search (first_CPU_state :: rm_first_last_CPU_trace).
+        rewrite <- H0 in H23.
+            assert (eval_constraint last_two_2_CPU_state last_CPU_state).
+            {admit. }
+            pose proof adjacent_CPU_state_cons eval_constraint last_two_2_CPU_state last_CPU_state  rm_last_two_CPU_trace H16 H23.
+      assert (rm_last_two_CPU_trace ++
+         [last_two_2_CPU_state] ++ [last_CPU_state]= (first_CPU_state :: rm_first_last_CPU_trace ++ [last_CPU_state])).
          {
-         admit.
+         admit.  (*这个很简单，帮我做一下。FLAG*)
          }
-         *)
-         admit.
-      
+         rewrite <- H26;tauto.
+       ++ tauto.
+       ++ rewrite H1.
+       Search rm_first_action_trace.
+       destruct rm_last_action_trace.
+       -- 
+       pose proof ActionListTraceSingle last_action.
+       Search (first_action :: rm_first_action_trace).
+       rewrite H1 in H12.
+       assert(rm_last_two_CPU_trace=[]).
+       {admit. }(*这个很简单，帮我做一下。FLAG*)
+       assert(rm_first_mem_list=[]).
+              {admit. }(*这个很简单，帮我做一下。FLAG*)
+       subst.
+       simpl in H12.
+       inversion H12.
+       ** inversion H21;clear H21.
+            subst.
+            pose proof H17 H24;simpl.
+            tauto.
+       **       unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H18.
+            simpl in H18. 
+            pose proof app_inj_tail (l++[x]) [] y {|
+         pc := last_two_2_CPU_state.(pc);
+         state :=
+           {|
+             memory := fun _ : int256 => zero;
+             program_state.stack := last_two_2_CPU_state.(stack)
+           |};
+         action := last_action
+       |} H18.
+       destruct H24.
+       pose proof app_eq_nil l [x] H24.
+       destruct H26.
+       discriminate.
+      -- pose proof cons_app_eq a rm_last_action_trace.
+          destruct H17 as [last_two_action [rm_last_two_action ?]].
+          rewrite H17.
+          Search ((first_action :: rm_first_action_trace)).
+          rewrite H1 in H12.
+          assert (((a :: rm_last_action_trace) ++ [last_action]) = ((rm_last_two_action ++ [last_two_action]) ++ [last_action])).
+          {admit. }(*这个很简单，帮我做一下。FLAG*)
+          rewrite H18 in H12.
+          inversion H12.
+          ** admit. (*这个是证明矛盾，比较长，不想做还是我做。FLAG*)
+          ** admit. (*这个一样是矛盾，帮我做一下。FLAG*)
+          ** Search (rm_first_mem_list).
+          rewrite H9 in H21.
+          Search (rm_last_two_action ++ [last_two_action]).
+          rename rm_last_action_trace into rm_first_last_action_trace.
+          assert (exists (a:CPU_state)(b:list CPU_state),rm_last_two_CPU_trace = (b++[a])).
+          {admit. }(*这个很简单，帮我做一下。FLAG*)
+          assert (exists (a:(int256->int256))(b:list (int256->int256)),rm_last_mem_list = (b++[a])).
+          {admit. }(*这个很简单，帮我做一下。FLAG*)
+          destruct H25 as [last_3_CPU_state [rm_last_3_CPU_trace ?]].
+                    destruct H26 as [last_2_mem [rm_last_2_mem_list ?]].
+         rewrite H26 in H21.
+         rewrite H25 in H21.
+         assert ([x]=(combine_to_act_state_list [last_3_CPU_state] [last_2_mem] [last_two_action])).
+         {admit. }(*这个有点复杂，有空可以做一下。FLAG*)
+         assert ([y]=(combine_to_act_state_list [last_two_2_CPU_state] [in_list_last_mem][last_action] )).
+                  {admit. }(*这个一样复杂，。FLAG*)
+unfold combine_to_act_state_list,combine_to_act_state,Definition_and_soundness.Build_program_state in H27,H28.
+    simpl in H27,H28.
+    inversion H27;clear H27.
+        inversion H28;clear H28.
+     inversion H23.
+     rewrite H29 in H28.
+          rewrite H30 in H28.
+     simpl in H28.
+     Search (a :: rm_first_last_action_trace).
+     rewrite H17 in H19.
+     pose proof ActionListTraceCons last_two_action last_action rm_last_two_action H28 H19.
+     tauto.
+    ++ apply trace_action with (CPU_trace:=first_CPU_state :: rm_first_last_CPU_trace ++ [last_CPU_state]) (action_trace:=first_action :: rm_first_action_trace).
+        inversion H20;clear H20;simpl in *;subst.
+        inversion H17.
+        ** clear H17;simpl in *;subst.
+        assert (Check_action first_CPU_state last_CPU_state first_action).
+        {admit. }
+        pose proof adjacent_CPU_state_for_action_trace_nil Check_action  first_CPU_state.
+        assert(rm_first_action_trace = []).
+        {admit. }(*这个很简单，帮我做一下。FLAG*)
+        rewrite H20.
+        simpl in *.
+        pose proof adjacent_CPU_state_for_action_trace_cons Check_action first_CPU_state last_CPU_state first_action [] [] H17 H18.
+        tauto.
+        ** 
+            pose proof adjacent_CPU_state_for_action_trace_cons Check_action x y action0 (l) l_action H20 H21.
+        Search (map ?p (?l++[?x])).
+        assert (y=last_two_2_CPU_state).
+        {admit. }(*这个很简单，帮我做一下。FLAG*)
+        assert ((l ++ [x])=rm_last_two_CPU_trace).
+        {admit. }(*这个很简单，帮我做一下。FLAG*)
+        assert (  (first_CPU_state
+   :: rm_first_last_CPU_trace ++ [last_CPU_state])=rm_last_two_CPU_trace ++ [last_two_2_CPU_state;last_CPU_state]).
+   {admit. }(*这个很简单，帮我做一下。FLAG*)
+        rewrite H27.
+rewrite H1.
+        assert (Check_action last_two_2_CPU_state last_CPU_state last_action).
+        {admit. }
+        rewrite H25 in H24.
+                rewrite H26 in H24.
+        Search (l_action ++ [action0]).
+        rewrite H23 in H24.
+        pose proof adjacent_CPU_state_for_action_trace_cons Check_action last_two_2_CPU_state last_CPU_state last_action (rm_last_two_CPU_trace) rm_last_action_trace H28 H24.
+        Search ((?l++[?x])++[?y]).
+        pose proof same_list rm_last_two_CPU_trace last_two_2_CPU_state last_CPU_state.
+        rewrite <- H30 in H29.
+        tauto.
+      ++
+          apply permutation with (action_trace:=  (first_action :: rm_first_action_trace))(memory_trace:=rm_last_mem_trace).
+        rewrite H1.
+        assert (filter mem_ins_type_is_not_non
+     (rm_last_action_trace ++ [last_action])=(filter mem_ins_type_is_not_non
+           rm_last_action_trace)).
+           {admit. }(*这个有点复杂但是Search filter就行，帮我做一下。FLAG*)
+       rewrite H17;tauto.
+      ++ tauto.
+      ++ apply public with (program:=  (first_CPU_state.(inst) :: rm_first_program))(CPU_trace:= (first_CPU_state
+   :: rm_first_last_CPU_trace ++ [last_CPU_state]))(action_trace:=(first_action :: rm_first_action_trace))(memory_trace:=rm_last_mem_trace).
+   *  (*读或写的情况*)
+      destruct H4 as [add[val [? ?]]].
+      destruct last_action.(mem_ins).
+       ++ clear H4. 
+       destruct H17.
+       destruct H4.
+       --   inversion H4;clear H4.
+           admit.
+       --  discriminate.
+       ++ clear H4. 
+       destruct H17.
+       destruct H4.
+       --   discriminate.
+       --  admit.
+       ++ pose proof H4 (ltac:(tauto)).
+            contradiction.
       - sets_unfold in H15.
         pose proof eval_ins_same_pc.
         pose proof out_property.
@@ -842,18 +1072,3 @@ Proof.
             pose proof zero_not_in_seq_one (Datatypes.length rm_first_program) H4;contradiction.
 Admitted.
            
-            
-            
-            (*
-         assert (exists (lb:action_type),
-         In a rm_last_mem_trace   ->
-         In a1 rm_last_mem_trace ->
-         a1.(mem_ins) = ins_type1/\(ins_type1 = read add1 val1 \/ ins_type1 = write add1 val1) -> 
-         a.(mem_ins) = ins_type/\(ins_type = read add0 val0 \/ ins_type = write add0 val0) ->
-         (Int256.unsigned add1 >=Int256.unsigned add0)%Z->
-         ((Int256.unsigned add1 = Int256.unsigned add)%Z ->a1.(timestamp)>a.(timestamp)) ->
-          (Int256.unsigned add <= Int256.unsigned address)%Z/\(Int256.unsigned add = Int256.unsigned address)%Z -> a.(timestamp)< timestamp0  ->(Int256.unsigned add1 >=Int256.unsigned address)%Z/\(add1 = address -> a1.(timestamp)>timestamp0) ).
-         {
-         
-         }
-         *)
